@@ -10,12 +10,19 @@
 // create any number of projects.
 //   node scripts/init-project.mjs "Acme Shop" ../acme-shop --fresh-git
 //   node scripts/init-project.mjs ../acme-shop --fresh-git          (name taken from the folder name)
+// Straight from GitHub, nothing cloned by hand (npm fetches this script, which shallow-clones the template repo set in
+// package.json "repository" into a temp folder; the project lands in ./acme-shop unless a destination is given):
+//   npx github:<owner>/<repo> "Acme Shop" --fresh-git
+//   npx github:<owner>/<repo> "Acme Shop" ./somewhere/acme-shop --fresh-git
+// From any git URL or local repository (a fork, another remote):
+//   node scripts/init-project.mjs "Acme Shop" ./acme-shop --from https://github.com/<owner>/<repo>.git --fresh-git
 //
 // project-name     e.g. "acme-shop", "AcmeShop" or "Acme Shop" (letters, digits, spaces, - or _). Optional when a
 //                  destination is given (defaults to its folder name); required in place.
 // destination      a path: contains / or \ or starts with . (./acme-shop, ../acme-shop, C:\code\acme-shop).
 //                  Must not exist yet (or be empty) and must be outside this template.
 // --package        Java base package (default: com.<name without separators>, e.g. com.acmeshop)
+// --from           git URL or path of the template to clone instead of this checkout (always copies, never in place)
 // --fresh-git      delete the template's git history and start a new repository with one initial commit
 // --dry-run        print what would change, touch nothing
 //
@@ -32,6 +39,7 @@
 import { execFileSync } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
 import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 
 const TEMPLATE = 'superapp'
@@ -42,8 +50,9 @@ const JAVA_KEYWORDS = new Set(('abstract assert boolean break byte case catch ch
   'new package private protected public return short static strictfp super switch synchronized this throw throws ' +
   'transient try void volatile while true false null var record yield sealed permits _').split(' '))
 
-const templateRoot = path.resolve(import.meta.dirname, '..')
-const scriptPath = path.relative(templateRoot, import.meta.filename).split(path.sep).join('/')
+/** The checkout (or npm's cached package) this script runs from. */
+const scriptHome = path.resolve(import.meta.dirname, '..')
+const scriptPath = path.relative(scriptHome, import.meta.filename).split(path.sep).join('/')
 
 function fail(message) {
   console.error(`\n✖ ${message}\n`)
@@ -53,17 +62,21 @@ function fail(message) {
 // ── Arguments ────────────────────────────────────────────────────────────────
 const args = process.argv.slice(2)
 const flags = new Set(args.filter((a) => a.startsWith('--') && !a.includes('=')))
-const packageArg = (() => {
-  const i = args.indexOf('--package')
+const VALUE_OPTIONS = ['--package', '--from']
+const optionValue = (option) => {
+  const i = args.indexOf(option)
   if (i >= 0) return args[i + 1]
-  return args.find((a) => a.startsWith('--package='))?.slice('--package='.length)
-})()
-const positional = args.filter((a, i) => !a.startsWith('--') && args[i - 1] !== '--package')
+  return args.find((a) => a.startsWith(`${option}=`))?.slice(option.length + 1)
+}
+const packageArg = optionValue('--package')
+const fromArg = optionValue('--from')
+const positional = args.filter((a, i) => !a.startsWith('--') && !VALUE_OPTIONS.includes(args[i - 1]))
 // Project names never contain path characters, so anything path-like is the destination.
 const isPath = (a) => /[\\/]/.test(a) || a.startsWith('.')
 const nameArg = positional.find((a) => !isPath(a))
 const destinationArg = positional.find(isPath)
-const usage = 'Usage: node scripts/init-project.mjs [project-name] [destination] [--package com.example.app] [--fresh-git] [--dry-run]'
+const usage =
+  'Usage: node scripts/init-project.mjs [project-name] [destination] [--package com.example.app] [--from <git-url>] [--fresh-git] [--dry-run]'
 if (flags.has('--help')) {
   console.log(usage)
   process.exit(0)
@@ -75,8 +88,50 @@ if (!nameArg && !destinationArg) fail(`Give a project name, a destination, or bo
 const dryRun = flags.has('--dry-run')
 const freshGit = flags.has('--fresh-git')
 
+/** "Acme Shop", "AcmeShop", "acme_shop" → ['acme', 'shop'] */
+function wordsOf(text) {
+  return text
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')
+    .split(/[^A-Za-z0-9]+/)
+    .filter(Boolean)
+    .map((w) => w.toLowerCase())
+}
+
+// ── Template source ──────────────────────────────────────────────────────────
+// Through `npx github:<owner>/<repo>` only this script is installed (package.json "files"), so the template is cloned
+// from git: that keeps every committed file exactly, .gitignore files and executable bits included, and nothing else.
+const installedCopy = scriptHome.split(path.sep).includes('node_modules')
+const cloneUrl = fromArg ?? (installedCopy ? repositoryUrl() : null)
+const templateRoot = cloneUrl ? cloneTemplate(cloneUrl) : scriptHome
+
+function repositoryUrl() {
+  const pkg = JSON.parse(fs.readFileSync(path.join(scriptHome, 'package.json'), 'utf8'))
+  const repo = typeof pkg.repository === 'string' ? pkg.repository : pkg.repository?.url
+  if (!repo || repo.includes('<owner>')) {
+    fail(`Set "repository" in the template's package.json (e.g. "github:you/SuperApp"), or pass --from <git-url>.`)
+  }
+  const github = /^github:([^/]+\/[^/#]+)$/.exec(repo)
+  return github ? `https://github.com/${github[1]}.git` : repo.replace(/^git\+/, '')
+}
+
+function cloneTemplate(url) {
+  const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'superapp-template-'))
+  process.on('exit', () => fs.rmSync(temp, { recursive: true, force: true }))
+  console.log(`Cloning the template from ${url} …`)
+  try {
+    execFileSync('git', ['clone', '--quiet', '--depth', '1', url, temp], { stdio: ['ignore', 'ignore', 'inherit'] })
+  } catch {
+    fail(`Could not clone ${url}. Check the URL and your git access.`)
+  }
+  return temp
+}
+
 // ── Destination ──────────────────────────────────────────────────────────────
-const destination = destinationArg ? path.resolve(destinationArg) : null
+// A cloned template is a temporary copy: never convert it in place. Without a destination the project then goes to
+// ./<project-name> in the current directory.
+const destinationInput = destinationArg ?? (cloneUrl && nameArg ? `./${wordsOf(nameArg).join('-')}` : null)
+const destination = destinationInput ? path.resolve(destinationInput) : null
 if (destination) {
   const fromTemplate = path.relative(templateRoot, destination)
   if (!fromTemplate || (!fromTemplate.startsWith('..') && !path.isAbsolute(fromTemplate))) {
@@ -95,12 +150,7 @@ if (!/^[A-Za-z][A-Za-z0-9 _-]*$/.test(input)) {
   fail(`"${input}" is not a valid project name: start with a letter; use letters, digits, spaces, - or _.` +
     (nameArg ? '' : ' Pass the name explicitly before the destination.'))
 }
-const words = input
-  .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
-  .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')
-  .split(/[^A-Za-z0-9]+/)
-  .filter(Boolean)
-  .map((w) => w.toLowerCase())
+const words = wordsOf(input)
 const cap = (w) => w[0].toUpperCase() + w.slice(1)
 const name = {
   kebab: words.join('-'),
@@ -280,6 +330,8 @@ if (!dryRun) {
   fs.rmSync(path.join(root, scriptPath))
   const scriptsDir = path.dirname(path.join(root, scriptPath))
   if (fs.readdirSync(scriptsDir).length === 0) fs.rmdirSync(scriptsDir)
+  // The root package.json only exists so `npx github:<owner>/<repo>` can find this script.
+  fs.rmSync(path.join(root, 'package.json'), { force: true })
 }
 
 // ── Git ─────────────────────────────────────────────────────────────────────
@@ -289,6 +341,10 @@ if (freshGit && !dryRun) {
   git('init', '--quiet', '--initial-branch=main')
   if (process.platform === 'win32') git('config', 'core.longpaths', 'true') // deep paths under long user folders
   git('add', '-A')
+  // Windows and npm tarballs don't keep the executable bit; record it so ./gradlew runs after a clone on macOS/Linux.
+  const wrappers = ['backend/gradlew', `keycloak/extensions/${name.kebab}-extensions/gradlew`]
+    .filter((p) => fs.existsSync(path.join(root, p)))
+  git('update-index', '--chmod=+x', ...wrappers)
   git('commit', '--quiet', '-m', `Initial commit: ${name.pascal} from the SuperApp template`)
   console.log('✔ Started a fresh git repository (one initial commit, no remote)')
 }

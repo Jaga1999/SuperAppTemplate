@@ -21,6 +21,17 @@ Or convert a fresh clone in place (this also renames its folder):
 node scripts/init-project.mjs "Acme Shop" --fresh-git
 ```
 
+Or straight from GitHub, without cloning anything yourself (needs Node 22+ and git). Set `"repository"` in the root
+`package.json` to your repo first (e.g. `"github:you/SuperApp"`):
+
+```bash
+npx github:you/SuperApp "Acme Shop" --fresh-git
+```
+
+npm fetches only the generator script; it shallow-clones the template from `repository` and creates `./acme-shop`.
+A project created this way gets a fresh `.env` from `.env.example` with generated secrets (your local `.env` is never
+on GitHub): add your Google client and SMTP settings to it. `--from <git-url>` clones any other repository or fork.
+
 The script (Node 22+, no dependencies) renames every spelling of the template name:
 
 | Template | Becomes (for `"Acme Shop"`) | Where |
