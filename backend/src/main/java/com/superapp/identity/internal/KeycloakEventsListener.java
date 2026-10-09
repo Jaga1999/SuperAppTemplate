@@ -10,7 +10,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 import com.superapp.auth.BffProperties;
 import com.superapp.auth.SessionRevocation;
@@ -50,7 +49,6 @@ class KeycloakEventsListener {
 
     @KafkaListener(id = "identity-events", topics = "${superapp.kafka.topics.keycloak-events}", groupId = "superapp-identity",
             containerFactory = KeycloakEventsKafkaConfig.CONTAINER_FACTORY)
-    @Transactional
     void on(String payload) {
         var message = json.readValue(payload, IdentityEventMessage.class);
         if (!realm.equals(message.realmName())) {
@@ -91,6 +89,8 @@ class KeycloakEventsListener {
         var userId = parse(m.userId());
 
         switch (resource + ":" + m.type()) {
+            // Created in the admin console: project it now, not only at the user's first sign-in.
+            case "USER:CREATE" -> publish(userId, UserProfileChanged::new);
             case "USER:DELETE" -> {
                 revokeEverything(userId);
                 publish(userId, UserDeleted::new);

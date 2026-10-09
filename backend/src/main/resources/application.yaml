@@ -30,10 +30,22 @@ spring:
     url: ${APP_DB_URL:jdbc:postgresql://localhost:5432/superapp}
     username: ${APP_DB_USER:superapp}
     password: ${APP_DB_PASSWORD:}
+    # Virtual threads make requests cheap; the pool is the real concurrency limit for the database.
+    # Size it against Postgres max_connections across all instances: instances × maximum-pool-size < max_connections.
     hikari:
       pool-name: superapp
-      maximum-pool-size: 20
-      minimum-idle: 2
+      maximum-pool-size: ${DB_POOL_MAX_SIZE:20}
+      minimum-idle: ${DB_POOL_MIN_IDLE:5}
+      connection-timeout: 5000       # ms: fail fast instead of piling up waiting requests
+      validation-timeout: 2000
+      idle-timeout: 300000           # 5 min
+      max-lifetime: 1800000          # 30 min, below any firewall/LB idle cut-off
+      keepalive-time: 120000         # 2 min liveness ping on idle connections
+      data-source-properties:
+        ApplicationName: superapp-backend   # shows up in pg_stat_activity
+        reWriteBatchedInserts: true         # multi-row INSERTs for JDBC batches
+        tcpKeepAlive: true
+        connectTimeout: 5                   # seconds
   jpa:
     open-in-view: false
     hibernate:
@@ -42,6 +54,11 @@ spring:
       hibernate:
         jdbc.time_zone: UTC
         timezone.default_storage: NORMALIZE_UTC
+        jdbc.batch_size: 50
+        order_inserts: true
+        order_updates: true
+        query.in_clause_parameter_padding: true                    # fewer distinct plans for IN (...) lists
+        query.fail_on_pagination_over_collection_fetch: true       # never paginate in memory
   flyway:
     locations: classpath:db/migration
 
@@ -50,21 +67,32 @@ spring:
       host: ${REDIS_HOST:localhost}
       port: 6379
       password: ${REDIS_PASSWORD:}
-      timeout: 2s
+      client-name: superapp-backend
+      connect-timeout: 2s
+      timeout: 2s              # command timeout; Lettuce shares one multiplexed connection (no pool needed)
+      lettuce:
+        shutdown-timeout: 200ms
 
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9094}
+    client-id: superapp-backend
     producer:
       acks: all
+      compression-type: lz4
       properties:
         enable.idempotence: true
         linger.ms: 5
+        max.block.ms: 5000             # never hang a caller when the broker is unreachable
+        request.timeout.ms: 10000
+        delivery.timeout.ms: 30000
     consumer:
       auto-offset-reset: earliest
+      max-poll-records: 100
       properties:
         isolation.level: read_committed
     listener:
       ack-mode: record
+      concurrency: 3                   # one consumer per partition (topics have 3)
       observation-enabled: true
 
   mvc:
@@ -104,6 +132,21 @@ logging:
   pattern:
     correlation: "[%X{requestId:-}] "
 
+# API description + Swagger UI on the BFF's own port. nginx routes only /api, /oauth2, /login/oauth2 and /auth to the
+# BFF, so these paths are never public. Dev (compose.override.yaml publishes 8081 on localhost):
+#   http://localhost:8081/swagger-ui.html   ·   http://localhost:8081/v3/api-docs
+springdoc:
+  paths-to-match: /api/**
+  api-docs:
+    enabled: ${API_DOCS_ENABLED:true}
+  swagger-ui:
+    enabled: ${API_DOCS_ENABLED:true}
+    display-request-duration: true
+    operations-sorter: alpha
+    tags-sorter: alpha
+    try-it-out-enabled: false   # the API needs the browser session + CSRF header of the real app
+  default-produces-media-type: application/json
+
 superapp:
   bff:
     public-url: ${PUBLIC_URL:http://localhost:8080}
@@ -133,8 +176,6 @@ superapp:
   kafka:
     topics:
       keycloak-events: keycloak.events
-  outbox:
-    poll-interval: PT0.5S
 
 ---
 spring:

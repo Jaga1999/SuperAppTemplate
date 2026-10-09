@@ -40,6 +40,6 @@
 ## Persistence and events
 
 - Schema only through Flyway (`db/migration/V<n>__*.sql`); `ddl-auto: none`.
-- Integration events go through `Outbox.publish(...)` in the business transaction (`Propagation.MANDATORY`).
+- Integration events: topics (and their `.DLT`) declared in `KafkaTopicsConfig`; consumers are idempotent.
 - New topic → declare it and its `.DLT` in `KafkaTopicsConfig`. Consumers are idempotent (de-duplicate on `eventId`).
 - Times are `Instant` in UTC; the JVM runs with `-Duser.timezone=UTC`.

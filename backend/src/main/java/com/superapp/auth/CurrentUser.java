@@ -26,15 +26,10 @@ public record CurrentUser(
         Set<String> roles) {
 
     public static final String ROLE_USER = "user";
-    public static final String ROLE_PREMIUM = "premium";
     public static final String ROLE_ADMIN = "admin";
 
     public boolean hasRole(String role) {
         return roles.contains(role);
-    }
-
-    public boolean isPremium() {
-        return hasRole(ROLE_PREMIUM) || hasRole(ROLE_ADMIN);
     }
 
     public boolean isAdmin() {

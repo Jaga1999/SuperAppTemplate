@@ -1,5 +1,7 @@
+'use client'
+
 import { ChevronsUpDownIcon, KeyRoundIcon, LogOutIcon, MonitorSmartphoneIcon, UserIcon } from 'lucide-react'
-import { useNavigate } from 'react-router'
+import { useRouter } from 'next/navigation'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
   DropdownMenu,
@@ -11,13 +13,13 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar'
-import { auth } from '../lib/auth'
-import { initials } from '../lib/format'
-import { useMe } from '../lib/queries'
+import { auth } from '@/lib/auth'
+import { initials } from '@/lib/format'
+import { useMe } from '@/lib/queries'
 
 export function UserMenu() {
   const { data: me } = useMe()
-  const navigate = useNavigate()
+  const router = useRouter()
   if (!me) return null
   const name = me.displayName || me.email || 'Account'
 
@@ -45,9 +47,9 @@ export function UserMenu() {
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem onSelect={() => navigate('/app/settings')}><UserIcon />Profile</DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => navigate('/app/settings/security')}><KeyRoundIcon />Security</DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => navigate('/app/settings/sessions')}><MonitorSmartphoneIcon />Devices</DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => router.push('/app/settings')}><UserIcon />Profile</DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => router.push('/app/settings/security')}><KeyRoundIcon />Security</DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => router.push('/app/settings/sessions')}><MonitorSmartphoneIcon />Devices</DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuItem variant="destructive" onSelect={() => void auth.signOut()}><LogOutIcon />Sign out</DropdownMenuItem>

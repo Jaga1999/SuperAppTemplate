@@ -21,11 +21,12 @@ import com.superapp.auth.internal.cookie.AuthCookies.Kind;
 import com.superapp.auth.internal.token.JwtPeek;
 import com.superapp.auth.internal.token.KeycloakTokenClient;
 import com.superapp.auth.internal.token.LogoutTokenVerifier;
+import com.superapp.auth.internal.web.docs.AuthApiDocs;
 
 /** Session plumbing of the BFF (unversioned; not part of the product API). */
 @RestController
 @RequestMapping("/api/auth")
-public class AuthController {
+public class AuthController implements AuthApiDocs {
 
     private static final Logger log = LoggerFactory.getLogger(AuthController.class);
 
@@ -47,7 +48,8 @@ public class AuthController {
      * access tokens instantly, clears cookies. Idempotent; works even if the session already expired.
      */
     @PostMapping("/logout")
-    ResponseEntity<Void> logout(HttpServletRequest request, HttpServletResponse response) {
+    @Override
+    public ResponseEntity<Void> logout(HttpServletRequest request, HttpServletResponse response) {
         cookies.read(request, Kind.ACCESS)
                 .flatMap(token -> JwtPeek.stringClaim(token, "sid"))
                 .ifPresent(revocation::revokeSession);
@@ -57,16 +59,14 @@ public class AuthController {
     }
 
     /**
-     * OIDC Back-Channel Logout (called by Keycloak on the private network, never by browsers; nginx blocks it).
+     * OIDC Back-Channel Logout 1.0, called by Keycloak on the private network (never by browsers; nginx blocks it).
      * Fired when a session ends anywhere: Keycloak admin, "sign out everywhere", password reset, idle timeout.
-     */
-    /**
-     * OIDC Back-Channel Logout 1.0, called by Keycloak on the private network.
      * Reads the form body directly: Spring Cloud Gateway's FormFilter re-exposes form posts as a body stream for
      * proxying, so {@code @RequestParam} would only ever see query parameters here.
      */
     @PostMapping(path = "/backchannel-logout", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
-    ResponseEntity<Void> backchannelLogout(@RequestBody MultiValueMap<String, String> form) {
+    @Override
+    public ResponseEntity<Void> backchannelLogout(@RequestBody MultiValueMap<String, String> form) {
         var logoutToken = form.getFirst("logout_token");
         if (logoutToken == null || logoutToken.isBlank()) {
             return ResponseEntity.badRequest().build();

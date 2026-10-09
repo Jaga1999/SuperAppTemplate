@@ -19,6 +19,7 @@ import com.superapp.auth.CurrentUser;
 import com.superapp.auth.SessionRevocation;
 import com.superapp.identity.IdentityDirectory;
 import com.superapp.shared.web.DomainException;
+import com.superapp.identity.internal.docs.AccountApiDocs;
 
 /**
  * Self-service account security, backed by Keycloak. Changing credentials (password, OTP, passkeys, recovery codes,
@@ -27,7 +28,7 @@ import com.superapp.shared.web.DomainException;
  */
 @RestController
 @RequestMapping(path = "/api/{version}/account", version = "1")
-class AccountController {
+public class AccountController implements AccountApiDocs {
 
     private final IdentityDirectory directory;
     private final SessionRevocation revocation;
@@ -39,14 +40,14 @@ class AccountController {
         this.identity = identity;
     }
 
-    record SessionView(String id, @Nullable String ipAddress, Instant startedAt, Instant lastAccessAt,
+    public record SessionView(String id, @Nullable String ipAddress, Instant startedAt, Instant lastAccessAt,
             boolean rememberMe, boolean current) {
     }
 
-    record CredentialView(String id, String type, @Nullable String label, @Nullable Instant createdAt) {
+    public record CredentialView(String id, String type, @Nullable String label, @Nullable Instant createdAt) {
     }
 
-    record SecurityOverview(
+    public record SecurityOverview(
             boolean hasPassword,
             boolean totpEnabled,
             int passkeys,
@@ -58,7 +59,8 @@ class AccountController {
     }
 
     @GetMapping("/sessions")
-    List<SessionView> sessions(CurrentUser user) {
+    @Override
+    public List<SessionView> sessions(CurrentUser user) {
         return directory.sessions(user.id()).stream()
                 .map(s -> new SessionView(s.id(), s.ipAddress(), s.startedAt(), s.lastAccessAt(), s.rememberMe(),
                         s.id().equals(user.sessionId())))
@@ -68,7 +70,8 @@ class AccountController {
     }
 
     @DeleteMapping("/sessions/{sessionId}")
-    ResponseEntity<Void> endSession(CurrentUser user, @PathVariable String sessionId) {
+    @Override
+    public ResponseEntity<Void> endSession(CurrentUser user, @PathVariable String sessionId) {
         if (!directory.endSession(user.id(), sessionId)) {
             throw new SessionNotFound();
         }
@@ -78,7 +81,8 @@ class AccountController {
 
     /** Signs out every other device; this browser stays signed in. */
     @PostMapping("/sessions/sign-out-others")
-    ResponseEntity<Void> signOutOthers(CurrentUser user) {
+    @Override
+    public ResponseEntity<Void> signOutOthers(CurrentUser user) {
         directory.sessions(user.id()).stream()
                 .filter(s -> !s.id().equals(user.sessionId()))
                 .forEach(s -> {
@@ -90,14 +94,16 @@ class AccountController {
 
     /** Signs out everywhere, including this browser. */
     @PostMapping("/sessions/sign-out-all")
-    ResponseEntity<Void> signOutAll(CurrentUser user) {
+    @Override
+    public ResponseEntity<Void> signOutAll(CurrentUser user) {
         directory.endAllSessions(user.id());
         revocation.revokeUser(user.id(), Instant.now());
         return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/security")
-    SecurityOverview security(CurrentUser user) {
+    @Override
+    public SecurityOverview security(CurrentUser user) {
         var credentials = directory.credentials(user.id());
         var linked = directory.linkedProviders(user.id());
         var linkedAliases = linked.stream().map(IdentityDirectory.LinkedProvider::alias).toList();
@@ -117,7 +123,8 @@ class AccountController {
     }
 
     @DeleteMapping("/linked-providers/{alias}")
-    ResponseEntity<Void> unlink(CurrentUser user, @PathVariable String alias) {
+    @Override
+    public ResponseEntity<Void> unlink(CurrentUser user, @PathVariable String alias) {
         var hasPassword = hasType(directory.credentials(user.id()), "password");
         var linked = directory.linkedProviders(user.id());
         if (linked.stream().noneMatch(p -> p.alias().equals(alias))) {

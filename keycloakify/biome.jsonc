@@ -11,9 +11,9 @@
 			"!src/kc.gen.tsx"
 		]
 	},
-	// Biome is the linter only: formatting and import sorting stay as written.
+	// Biome lints and keeps imports sorted (`npm run lint` fails on unsorted imports); it does not reformat code.
 	"formatter": { "enabled": false },
-	"assist": { "enabled": false },
+	"assist": { "enabled": true, "actions": { "source": { "organizeImports": "on" } } },
 	"css": { "parser": { "tailwindDirectives": true } },
 	"linter": {
 		"enabled": true,

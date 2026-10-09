@@ -4,20 +4,20 @@
 	"files": {
 		"includes": [
 			"**",
-			"!dist",
+			"!.next",
 			"!node_modules",
-			"!public",
+			"!next-env.d.ts",
 			"!e2e/playwright-report",
 			"!e2e/test-results"
 		]
 	},
-	// Biome is the linter only: formatting and import sorting stay as written.
+	// Biome lints and keeps imports sorted (`npm run lint` fails on unsorted imports); it does not reformat code.
 	"formatter": { "enabled": false },
-	"assist": { "enabled": false },
+	"assist": { "enabled": true, "actions": { "source": { "organizeImports": "on" } } },
 	"css": { "parser": { "tailwindDirectives": true } },
 	"linter": {
 		"enabled": true,
-		"domains": { "react": "recommended" },
+		"domains": { "react": "recommended", "next": "recommended" },
 		"rules": {
 			"preset": "recommended",
 			// Index keys are only used for fixed-length lists that never reorder (skeletons, OTP slots, Keycloak-provided lists).

@@ -9,7 +9,6 @@ export type Me = {
   familyName: string | null
   pictureUrl: string | null
   roles: string[]
-  premium: boolean
   admin: boolean
   sessionId: string
   memberSince: string | null
@@ -57,4 +56,25 @@ export type AdminUser = {
   status: 'ACTIVE' | 'DISABLED' | 'DELETED'
   createdAt: string
   lastLoginAt: string | null
+}
+
+export type AdminSession = {
+  id: string
+  ipAddress: string | null
+  startedAt: string
+  lastAccessAt: string
+  rememberMe: boolean
+  clients: string[]
+}
+
+export type AdminUserDetail = {
+  user: AdminUser
+  inKeycloak: boolean
+  enabled: boolean
+  emailVerified: boolean
+  firstName: string | null
+  lastName: string | null
+  credentialTypes: string[]
+  linkedProviders: { alias: string; username: string | null }[]
+  sessions: AdminSession[]
 }

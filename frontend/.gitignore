@@ -23,3 +23,9 @@ dist-ssr
 *.sln
 *.sw?
 dist_keycloak
+
+# Next.js
+.next
+out
+next-env.d.ts
+*.tsbuildinfo

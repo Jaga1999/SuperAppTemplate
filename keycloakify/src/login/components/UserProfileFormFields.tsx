@@ -1,12 +1,12 @@
-import { MinusIcon, PlusIcon } from 'lucide-react'
 import type { Attribute } from 'keycloakify/login/KcContext'
 import {
-  getButtonToDisplayForMultivaluedAttributeField,
   type FormAction,
   type FormFieldError,
+  getButtonToDisplayForMultivaluedAttributeField,
   useUserProfileForm,
 } from 'keycloakify/login/lib/useUserProfileForm'
 import type { UserProfileFormFieldsProps } from 'keycloakify/login/UserProfileFormFieldsProps'
+import { MinusIcon, PlusIcon } from 'lucide-react'
 import { type Dispatch, Fragment, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'

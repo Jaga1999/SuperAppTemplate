@@ -50,7 +50,8 @@ import tools.jackson.databind.json.JsonMapper;
  *  2  /oauth2/**, /login/oauth2/** → OAuth2 login: start (PKCE) + callback → tokens into encrypted cookies
  *  3  /api/**                     → resource server: cookie → silent refresh → JWT verify → revocation → roles
  *  4  actuator (port 9090)        → health / info / prometheus only
- *  5  everything else             → denied
+ *  5  /v3/api-docs, /swagger-ui   → API description (never routed by nginx)
+ *  6  everything else             → denied
  * </pre>
  */
 @Configuration(proxyBeanMethods = false)
@@ -156,8 +157,24 @@ public class SecurityConfig {
                 .build();
     }
 
+    /**
+     * API description and Swagger UI (springdoc). Read-only and unauthenticated, but never public: nginx routes no
+     * such path to the BFF. Turned off entirely with {@code API_DOCS_ENABLED=false}.
+     */
     @Bean
     @Order(5)
+    SecurityFilterChain apiDocsChain(HttpSecurity http) throws Exception {
+        return http
+                .securityMatcher("/v3/api-docs/**", "/v3/api-docs", "/swagger-ui/**", "/swagger-ui.html")
+                .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
+                .csrf(AbstractHttpConfigurer::disable)
+                .requestCache(AbstractHttpConfigurer::disable)
+                .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .build();
+    }
+
+    @Bean
+    @Order(6)
     SecurityFilterChain denyEverythingElse(HttpSecurity http) throws Exception {
         return http
                 .authorizeHttpRequests(auth -> auth

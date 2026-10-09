@@ -9,8 +9,9 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "typecheck": "tsc -b",
-    "lint": "biome lint",
-    "build-keycloak-theme": "npm run build && keycloakify build"
+    "lint": "biome check",
+    "build-keycloak-theme": "npm run build && keycloakify build",
+    "lint:fix": "biome check --write"
   },
   "dependencies": {
     "@fontsource-variable/geist": "^5.3.0",

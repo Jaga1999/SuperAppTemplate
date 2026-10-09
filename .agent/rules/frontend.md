@@ -1,11 +1,11 @@
-# Frontend rules (two independent React projects, npm only)
+# Frontend rules (two independent projects, npm only)
 
 ## Projects
 
 | Folder | Purpose | Notes |
 |---|---|---|
-| `frontend/` | Product SPA, served by nginx | Playwright e2e suite in `frontend/e2e` |
-| `keycloakify/` | Keycloakify login theme, baked into the Keycloak image | Never imports from `frontend/` |
+| `frontend/` | Product app, Next.js 16 App Router (standalone server behind nginx) | Playwright e2e suite in `frontend/e2e` |
+| `keycloakify/` | Keycloakify login theme (React + Vite), baked into the Keycloak image | Never imports from `frontend/` |
 
 The two projects share no code and have their own `package.json`, `package-lock.json` and copy of the UI kit
 (`src/components/ui`, `src/lib/utils.ts`, `src/styles/globals.css`). When you change a design token or a shared
@@ -13,8 +13,14 @@ component, apply it to both copies so the app and the sign-in pages keep looking
 
 ## Stack and style
 
-- npm only (never pnpm or yarn). React 19, TypeScript 7 (strict), Vite 8, Tailwind 4 (tokens in
-  `src/styles/globals.css`), shadcn (`radix-nova` style), TanStack Query 5, React Router 8. Lint with Biome (`npm run lint`, config in `biome.jsonc`; linter only, no formatter).
+- npm only (never pnpm or yarn). React 19, TypeScript 7 (strict), Tailwind 4 (tokens in `src/styles/globals.css`),
+  shadcn (`radix-nova` style). `frontend/`: Next.js 16 App Router, TanStack Query 5, Zustand 5. `keycloakify/`: Vite.
+  Lint with Biome (`npm run lint` = `biome check`: lint rules + sorted imports; no formatter).
+- Next.js: routes in `src/app` stay thin server components (metadata, layout); screens are client components in
+  `src/views`. Navigation with `next/link` and `next/navigation` only. Typed routes are on: hrefs are `Route`s.
+- Security headers live in `next.config.ts`; the CSP is per request in `src/proxy.ts` (nonce, `strict-dynamic`, no
+  `unsafe-inline` scripts). Never add inline scripts without the nonce, never call the BFF from server components,
+  never put secrets in `NEXT_PUBLIC_*` variables.
 - Imports: `@/components/ui/<name>`, `@/lib/utils`, `@/hooks/<name>` (`@` = the project's `src/`).
 - New shadcn components: `cd frontend && npx shadcn@latest add <name>` (or in `keycloakify/`).
 - Colors only through tokens (`bg-primary`, `text-muted-foreground`, ...). Every screen works in light and dark mode
@@ -22,6 +28,8 @@ component, apply it to both copies so the app and the sign-in pages keep looking
 - Accessible by default: labelled inputs, `aria-label` on icon buttons, keyboard reachable, visible focus.
 
 ## Talking to the server (frontend/)
+
+- Only the browser calls the BFF. The Next.js server has no network route to the BFF or Keycloak.
 
 - Only `src/lib/api.ts` performs requests: same origin, cookies, XSRF header, `ApiError` from problem details.
 - Server state lives in TanStack Query (`src/lib/queries.ts`, keys in `keys`). No duplicated server state in React state.

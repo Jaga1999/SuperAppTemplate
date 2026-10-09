@@ -1,9 +1,11 @@
 package com.superapp.user.internal;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 import org.jspecify.annotations.Nullable;
+import org.springframework.data.domain.Limit;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -38,6 +40,10 @@ interface AppUserRepository extends JpaRepository<AppUser, UUID> {
             @Param("givenName") @Nullable String givenName, @Param("familyName") @Nullable String familyName,
             @Param("pictureUrl") @Nullable String pictureUrl, @Param("now") Instant now,
             @Param("lastLoginAt") @Nullable Instant lastLoginAt);
+
+    /** Keyset page of ids still holding personal data (stable under concurrent inserts, no OFFSET scans). */
+    @Query("select u.id from AppUser u where u.status <> :erased and u.id > :after order by u.id")
+    List<UUID> idsAfter(@Param("after") UUID after, @Param("erased") AppUser.Status erased, Limit limit);
 
     long countByStatus(AppUser.Status status);
 

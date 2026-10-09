@@ -1,18 +1,15 @@
-import { ArrowLeftIcon, CheckIcon, GlobeIcon, LockKeyholeIcon, RotateCcwIcon } from 'lucide-react'
 import { useInitialize } from 'keycloakify/login/Template.useInitialize'
 import type { TemplateProps } from 'keycloakify/login/TemplateProps'
-import { useEffect, type ReactNode } from 'react'
+import { ArrowLeftIcon, CheckIcon, LockKeyholeIcon, RotateCcwIcon } from 'lucide-react'
+import { lazy, type ReactNode, Suspense, useEffect } from 'react'
 import { Logo, LogoMark } from '@/components/ui/brand/logo'
 import { Button } from '@/components/ui/button'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
 import { KcMessage, TextLink } from './components/kc-ui'
 import type { I18n } from './i18n'
 import type { KcContext } from './KcContext'
+
+// Only realms with several languages pay for the dropdown (see language-menu.tsx).
+const LanguageMenu = lazy(() => import('./components/language-menu'))
 
 const CURRENT_YEAR = new Date().getFullYear()
 
@@ -53,7 +50,7 @@ export default function Template(props: SuperAppTemplateProps) {
     children,
   } = props
 
-  const { msg, msgStr, currentLanguage, enabledLanguages } = i18n
+  const { msg, msgStr, enabledLanguages } = i18n
   const { realm, auth, url, message, isAppInitiatedAction, client } = kcContext
 
   useSystemColorScheme()
@@ -104,21 +101,9 @@ export default function Template(props: SuperAppTemplateProps) {
           <Logo className="lg:invisible" />
           <div className="flex items-center gap-1">
             {enabledLanguages.length > 1 && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="sm" aria-label={msgStr('languages')} className="text-muted-foreground gap-1.5">
-                    <GlobeIcon />
-                    {currentLanguage.label}
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  {enabledLanguages.map(({ languageTag, label, href }) => (
-                    <DropdownMenuItem key={languageTag} asChild>
-                      <a href={href}>{label}</a>
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <Suspense>
+                <LanguageMenu i18n={i18n} />
+              </Suspense>
             )}
             {backUrl && (
               <Button variant="ghost" size="sm" asChild className="text-muted-foreground">

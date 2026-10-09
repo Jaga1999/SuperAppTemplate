@@ -1,7 +1,7 @@
 import { keepPreviousData, queryOptions, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { ApiError, api } from './api'
-import type { AdminOverview, AdminUser, Me, Page, PublicConfig, SecurityOverview, SessionView } from './types'
+import type { AdminOverview, AdminUser, AdminUserDetail, Me, Page, PublicConfig, SecurityOverview, SessionView } from './types'
 
 /** Query keys in one place: invalidation stays correct as the app grows. */
 export const keys = {
@@ -11,6 +11,7 @@ export const keys = {
   security: ['security'] as const,
   adminOverview: ['admin', 'overview'] as const,
   adminUsers: (page: number) => ['admin', 'users', page] as const,
+  adminUser: (id: string) => ['admin', 'user', id] as const,
 }
 
 /** null = not signed in (401). The whole app's auth state derives from this one query. */
@@ -46,6 +47,9 @@ export const useAdminUsers = (page: number) =>
     queryFn: () => api.get<Page<AdminUser>>(`/api/v1/admin/users?page=${page}&size=20`),
     placeholderData: keepPreviousData,
   })
+
+export const useAdminUser = (id: string) =>
+  useQuery({ queryKey: keys.adminUser(id), queryFn: () => api.get<AdminUserDetail>(`/api/v1/admin/users/${encodeURIComponent(id)}`) })
 
 export function errorToast(error: unknown) {
   if (error instanceof ApiError) {
@@ -100,9 +104,26 @@ export function useUnlinkProvider() {
 }
 
 export function useAdminSignOut() {
+  const qc = useQueryClient()
   return useMutation({
-    mutationFn: (userId: string) => api.post(`/api/v1/admin/users/${userId}/sign-out`),
-    onSuccess: () => toast.success('User signed out everywhere'),
+    mutationFn: (userId: string) => api.post(`/api/v1/admin/users/${encodeURIComponent(userId)}/sign-out`),
+    onSuccess: () => {
+      toast.success('User signed out everywhere')
+      return qc.invalidateQueries({ queryKey: ['admin'] })
+    },
+    onError: errorToast,
+  })
+}
+
+export function useAdminEndSession(userId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (sessionId: string) =>
+      api.delete(`/api/v1/admin/users/${encodeURIComponent(userId)}/sessions/${encodeURIComponent(sessionId)}`),
+    onSuccess: () => {
+      toast.success('Session signed out')
+      return qc.invalidateQueries({ queryKey: keys.adminUser(userId) })
+    },
     onError: errorToast,
   })
 }

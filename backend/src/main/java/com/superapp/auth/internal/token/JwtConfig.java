@@ -6,6 +6,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 
+import org.jspecify.annotations.Nullable;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
@@ -78,11 +79,23 @@ public class JwtConfig {
 
     private static OAuth2TokenValidator<Jwt> revocationValidator(SessionRevocation revocation) {
         return jwt -> {
+            var userId = userId(jwt.getSubject());
+            if (userId == null) {
+                return OAuth2TokenValidatorResult.failure(new OAuth2Error("invalid_token", "Subject is not a user id", null));
+            }
             var issuedAt = Objects.requireNonNullElse(jwt.getIssuedAt(), Instant.EPOCH);
             var sid = Objects.requireNonNullElse(jwt.getClaimAsString("sid"), "");
-            return revocation.isRevoked(sid, UUID.fromString(jwt.getSubject()), issuedAt)
+            return revocation.isRevoked(sid, userId, issuedAt)
                     ? OAuth2TokenValidatorResult.failure(new OAuth2Error("invalid_token", "Session revoked", null))
                     : OAuth2TokenValidatorResult.success();
         };
+    }
+
+    private static @Nullable UUID userId(@Nullable String subject) {
+        try {
+            return subject != null ? UUID.fromString(subject) : null;
+        } catch (IllegalArgumentException _) {
+            return null;
+        }
     }
 }

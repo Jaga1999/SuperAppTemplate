@@ -1,7 +1,7 @@
+import { REGEXP_ONLY_DIGITS } from 'input-otp'
 import { useScript as useRecoveryCodesScript } from 'keycloakify/login/pages/LoginRecoveryAuthnCodeConfig.useScript'
 import { useScript as useWebauthnAuthenticateScript } from 'keycloakify/login/pages/WebauthnAuthenticate.useScript'
 import { useScript as useWebauthnRegisterScript } from 'keycloakify/login/pages/WebauthnRegister.useScript'
-import { REGEXP_ONLY_DIGITS } from 'input-otp'
 import {
   ChevronRightIcon,
   CopyIcon,

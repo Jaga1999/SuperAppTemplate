@@ -13,18 +13,15 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
-import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.assertj.MockMvcTester;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
-import org.springframework.transaction.support.TransactionTemplate;
 
 import com.superapp.auth.internal.cookie.AuthCookies;
 import com.superapp.auth.internal.token.TokenSet;
-import com.superapp.shared.outbox.Outbox;
 
 import tools.jackson.databind.json.JsonMapper;
 
@@ -42,8 +39,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
         "superapp.bff.encryption-key=AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=",
         "superapp.bff.keycloak.internal-url=http://keycloak.invalid/auth",
         "superapp.bff.keycloak.client-secret=test-secret",
-        "superapp.bff.keycloak.admin-client-secret=test-secret",
-        "superapp.outbox.poll-interval=PT0.1S"
+        "superapp.bff.keycloak.admin-client-secret=test-secret"
 })
 class ApiIntegrationTest {
 
@@ -51,19 +47,10 @@ class ApiIntegrationTest {
     MockMvcTester mvc;
 
     @Autowired
-    JdbcClient jdbc;
-
-    @Autowired
     AuthCookies cookies;
 
     @Autowired
     JsonMapper json;
-
-    @Autowired
-    Outbox outbox;
-
-    @Autowired
-    TransactionTemplate tx;
 
     private static RequestPostProcessor as(UUID userId, String... roles) {
         var authorities = Arrays.stream(roles)
@@ -89,11 +76,10 @@ class ApiIntegrationTest {
     @Test
     void signedInUserGetsTheirProfile() {
         var user = UUID.randomUUID();
-        assertThat(mvc.get().uri("/api/v1/me").with(as(user, "user", "premium")))
+        assertThat(mvc.get().uri("/api/v1/me").with(as(user, "user")))
                 .hasStatusOk()
                 .bodyJson().satisfies(body -> {
                     assertThat(body).extractingPath("$.id").isEqualTo(user.toString());
-                    assertThat(body).extractingPath("$.premium").isEqualTo(true);
                     assertThat(body).extractingPath("$.admin").isEqualTo(false);
                 });
     }
@@ -110,27 +96,6 @@ class ApiIntegrationTest {
         var cookie = response.getCookies()[0];
 
         assertThat(mvc.post().uri("/api/v1/account/sessions/sign-out-others").cookie(cookie)).hasStatus(403);
-    }
-
-    record Ping(String type, UUID id) {
-    }
-
-    @Test
-    void outboxEventsAreRelayedToKafka() throws InterruptedException {
-        var id = UUID.randomUUID();
-        tx.executeWithoutResult(_ -> outbox.publish("test.outbox", id.toString(), new Ping("Ping", id)));
-
-        var deadline = Instant.now().plus(Duration.ofSeconds(30));
-        long published = 0;
-        while (Instant.now().isBefore(deadline)) {
-            published = jdbc.sql("select count(*) from outbox_event where message_key = :k and published_at is not null")
-                    .param("k", id.toString()).query(Long.class).single();
-            if (published > 0) {
-                break;
-            }
-            Thread.sleep(200);
-        }
-        assertThat(published).isEqualTo(1);
     }
 
     @Test

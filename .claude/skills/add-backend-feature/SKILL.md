@@ -20,8 +20,8 @@ Rules: `.agent/rules/backend.md`, `.agent/rules/security.md`, `.agent/rules/test
 4. **API** — `@RestController @RequestMapping(path = "/api/{version}/<plural>", version = "1")`. Records for requests
    (Bean Validation; optional fields as `@Nullable` wrappers) and responses. `CurrentUser user` for the caller.
    Ownership checks in the service; failures as `DomainException`.
-5. **Events (if other features react)** — `Outbox.publish(TOPIC, ownerId, event)` inside the service transaction;
-   declare topic and `.DLT` in `shared/config/KafkaTopicsConfig`; the consumer reads its own record and is idempotent.
+5. **Events (if other features react)** — declare the topic and `.DLT` in `shared/config/KafkaTopicsConfig`,
+   publish with `KafkaTemplate`; the consumer reads its own record and is idempotent.
 6. **User deletion** — if the feature stores per-user data, delete it on `IdentityEvent.UserDeleted` (see
    `user/internal/UserProjection`).
 7. **Tests** — service unit test; API tests in the `ApiIntegrationTest` style (same annotations so the context is

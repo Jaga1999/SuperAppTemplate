@@ -11,11 +11,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.superapp.auth.CurrentUser;
+import com.superapp.user.internal.docs.MeApiDocs;
 
 /** The signed-in user, as the SPA needs it. The SPA's single source of "am I signed in?". */
 @RestController
 @RequestMapping(path = "/api/{version}/me", version = "1")
-class MeController {
+public class MeController implements MeApiDocs {
 
     private final AppUserRepository users;
 
@@ -23,7 +24,7 @@ class MeController {
         this.users = users;
     }
 
-    record Me(
+    public record Me(
             UUID id,
             @Nullable String email,
             boolean emailVerified,
@@ -32,14 +33,14 @@ class MeController {
             @Nullable String familyName,
             @Nullable String pictureUrl,
             List<String> roles,
-            boolean premium,
             boolean admin,
             String sessionId,
             @Nullable Instant memberSince) {
     }
 
     @GetMapping
-    @Transactional(readOnly = true)
+    @Override
+    public @Transactional(readOnly = true)
     Me me(CurrentUser user) {
         var local = users.findById(user.id());
         return new Me(
@@ -51,7 +52,6 @@ class MeController {
                 local.map(AppUser::familyName).orElse(null),
                 local.map(AppUser::pictureUrl).orElse(null),
                 user.sortedRoles(),
-                user.isPremium(),
                 user.isAdmin(),
                 user.sessionId(),
                 local.map(AppUser::createdAt).orElse(null));

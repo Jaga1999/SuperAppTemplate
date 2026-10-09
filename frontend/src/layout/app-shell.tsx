@@ -1,7 +1,13 @@
-import { CrownIcon, HouseIcon, LayoutDashboardIcon, SettingsIcon, ShieldIcon } from 'lucide-react'
-import { NavLink, Outlet, useLocation } from 'react-router'
+'use client'
+
+import { HouseIcon, LayoutDashboardIcon, SettingsIcon, ShieldIcon } from 'lucide-react'
+import type { Route } from 'next'
+import Link from 'next/link'
+import { usePathname } from 'next/navigation'
+import { type ReactNode, Suspense } from 'react'
+import { ActionStatusToasts } from '@/components/action-status-toasts'
+import { ThemeToggle } from '@/components/theme-toggle'
 import { Logo } from '@/components/ui/brand/logo'
-import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import {
   Sidebar,
@@ -19,12 +25,10 @@ import {
   SidebarRail,
   SidebarTrigger,
 } from '@/components/ui/sidebar'
-import { ActionStatusToasts } from '../components/action-status-toasts'
-import { ThemeToggle } from '../components/theme-toggle'
-import { UserMenu } from '../components/user-menu'
-import { useMe } from '../lib/queries'
+import { UserMenu } from '@/components/user-menu'
+import { useMe } from '@/lib/queries'
 
-const nav = [
+const nav: { to: Route; label: string; icon: typeof HouseIcon; end?: boolean }[] = [
   { to: '/app', label: 'Home', icon: HouseIcon, end: true },
   { to: '/app/settings', label: 'Settings', icon: SettingsIcon },
 ]
@@ -37,17 +41,17 @@ const titles: Record<string, string> = {
   '/app/admin': 'Admin',
 }
 
-export function AppShell() {
+export function AppShell({ children }: { children: ReactNode }) {
   const { data: me } = useMe()
-  const { pathname } = useLocation()
+  const pathname = usePathname()
 
   return (
     <SidebarProvider>
       <Sidebar collapsible="icon" variant="inset">
         <SidebarHeader className="px-3 pt-3">
-          <NavLink to="/app" className="flex h-9 items-center group-data-[collapsible=icon]:justify-center">
+          <Link href="/app" className="flex h-9 items-center group-data-[collapsible=icon]:justify-center">
             <Logo className="group-data-[collapsible=icon]:[&>span:last-child]:hidden" />
-          </NavLink>
+          </Link>
         </SidebarHeader>
         <SidebarContent>
           <SidebarGroup>
@@ -57,10 +61,10 @@ export function AppShell() {
                 {nav.map((item) => (
                   <SidebarMenuItem key={item.to}>
                     <SidebarMenuButton asChild tooltip={item.label} isActive={item.end ? pathname === item.to : pathname.startsWith(item.to)}>
-                      <NavLink to={item.to} end={item.end}>
+                      <Link href={item.to} aria-current={(item.end ? pathname === item.to : pathname.startsWith(item.to)) ? 'page' : undefined}>
                         <item.icon />
                         <span>{item.label}</span>
-                      </NavLink>
+                      </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 ))}
@@ -74,10 +78,10 @@ export function AppShell() {
                 <SidebarMenu>
                   <SidebarMenuItem>
                     <SidebarMenuButton asChild tooltip="Admin" isActive={pathname.startsWith('/app/admin')}>
-                      <NavLink to="/app/admin">
+                      <Link href="/app/admin" aria-current={pathname.startsWith('/app/admin') ? 'page' : undefined}>
                         <ShieldIcon />
                         <span>Admin</span>
-                      </NavLink>
+                      </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 </SidebarMenu>
@@ -96,23 +100,20 @@ export function AppShell() {
           <SidebarTrigger className="-ml-1" />
           <Separator orientation="vertical" className="mr-1 data-[orientation=vertical]:h-4" />
           <LayoutDashboardIcon className="text-muted-foreground size-4" />
-          <h1 className="text-sm font-medium">{titles[pathname] ?? 'SuperApp'}</h1>
-          {me?.premium && (
-            <Badge variant="secondary" className="ml-1 gap-1">
-              <CrownIcon className="size-3" /> Premium
-            </Badge>
-          )}
+          <h1 className="text-sm font-medium">{titles[pathname] ?? (pathname.startsWith('/app/admin') ? 'Admin' : 'SuperApp')}</h1>
           <div className="ml-auto flex items-center gap-1">
             <ThemeToggle />
           </div>
         </header>
         <main className="flex-1 px-4 py-6 md:px-8 md:py-8">
           <div className="mx-auto w-full max-w-5xl">
-            <Outlet />
+            {children}
           </div>
         </main>
       </SidebarInset>
-      <ActionStatusToasts />
+      <Suspense>
+        <ActionStatusToasts />
+      </Suspense>
     </SidebarProvider>
   )
 }

@@ -17,8 +17,9 @@ SuperApp is a reusable template: a Spring Boot 4.1 / Java 25 **BFF** (Gradle, si
 ArchUnit, no Spring Modulith) behind an **nginx** edge, with **Keycloak 26.8 on Java 25** hidden behind the BFF's
 allow-listed proxy. The browser holds no tokens (encrypted `__Host-` cookies). Everything runs in Docker; the app and
 Keycloak each have their **own** Postgres and Kafka (Redis is app-only). Flyway owns the app schema.
-Two independent React projects, npm only: `frontend/` (product SPA + Playwright e2e in `frontend/e2e`) and
-`keycloakify/` (Keycloakify login theme). They share no code; each has its own copy of the shadcn UI kit.
+Two independent projects, npm only: `frontend/` (product app, Next.js 16 App Router + Playwright e2e in
+`frontend/e2e`) and `keycloakify/` (Keycloakify login theme, React + Vite). They share no code; each has its own copy
+of the shadcn UI kit. Browsers reach Keycloak only through the BFF; the Next.js server talks to nothing but nginx.
 
 ## Commands
 

@@ -18,7 +18,7 @@ public final class JwtPeek {
     private JwtPeek() {
     }
 
-    public static Optional<JWTClaimsSet> claims(String token) {
+    private static Optional<JWTClaimsSet> claims(String token) {
         try {
             return Optional.of(JWTParser.parse(token).getJWTClaimsSet());
         } catch (ParseException _) {

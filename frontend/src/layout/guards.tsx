@@ -1,12 +1,14 @@
+'use client'
+
 import { RotateCcwIcon, ShieldAlertIcon } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 import { type ReactNode, useEffect } from 'react'
-import { Navigate, Outlet } from 'react-router'
 import { Logo } from '@/components/ui/brand/logo'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { ApiError } from '../lib/api'
-import { auth } from '../lib/auth'
-import { useMe } from '../lib/queries'
+import { ApiError } from '@/lib/api'
+import { auth } from '@/lib/auth'
+import { useMe } from '@/lib/queries'
 
 /**
  * Signed-in only.
@@ -52,11 +54,17 @@ export function RequireAuth({ children }: { children: ReactNode }) {
   return <>{children}</>
 }
 
-/** Role gate for nested routes. The BFF enforces the same rule; this only avoids showing a dead page. */
-export function RequireRole({ role }: { role: 'admin' | 'premium' }) {
+/** Role gate for a route subtree. The BFF enforces the same rule; this only avoids showing a dead page. */
+export function RequireRole({ role, children }: { role: 'admin'; children: ReactNode }) {
   const { data: me } = useMe()
-  const allowed = role === 'admin' ? me?.admin : me?.premium
-  return allowed ? <Outlet /> : <Navigate to="/app" replace />
+  const router = useRouter()
+  const allowed = role === 'admin' && me?.admin === true
+
+  useEffect(() => {
+    if (me && !allowed) router.replace('/app')
+  }, [me, allowed, router])
+
+  return allowed ? children : null
 }
 
 function FullPageSkeleton() {

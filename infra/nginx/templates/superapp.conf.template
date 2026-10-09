@@ -1,16 +1,21 @@
 # Rendered by the nginx image entrypoint (envsubst) into /etc/nginx/conf.d/superapp.conf.
-# ${BACKEND_UPSTREAM} → the Spring BFF. nginx never talks to Keycloak directly.
+# ${BACKEND_UPSTREAM}  → the Spring BFF (API, login, Keycloak's pages). nginx never talks to Keycloak directly.
+# ${FRONTEND_UPSTREAM} → the Next.js server (pages only; it never calls the BFF or Keycloak itself).
 
 upstream bff {
     server ${BACKEND_UPSTREAM};
     keepalive 64;
 }
 
+upstream web {
+    server ${FRONTEND_UPSTREAM};
+    keepalive 32;
+}
+
 server {
     listen 8080;
     server_name _;
 
-    root /usr/share/nginx/html;
     limit_conn edge_conn 50;
 
     # ── Shared proxy settings ───────────────────────────────────────────────
@@ -70,23 +75,18 @@ server {
         proxy_pass http://bff;
     }
 
-    # ── SPA ──────────────────────────────────────────────────────────────────
-    location /assets/ {
+    # ── Next.js app ──────────────────────────────────────────────────────────
+    # Hashed, immutable build assets (Next.js sends Cache-Control: immutable).
+    location /_next/static/ {
+        limit_req zone=edge_static burst=200 nodelay;
         access_log off;
-        add_header Cache-Control "public, max-age=31536000, immutable" always;
-        add_header X-Content-Type-Options "nosniff" always;
-        try_files $uri =404;
+        proxy_pass http://web;
     }
 
+    # Pages. Security headers incl. the per-request nonce CSP come from the Next.js server (src/proxy.ts).
     location / {
-        try_files $uri /index.html;
-        add_header Cache-Control "no-cache" always;
-        add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://lh3.googleusercontent.com; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'" always;
-        add_header X-Content-Type-Options "nosniff" always;
-        add_header X-Frame-Options "DENY" always;
-        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-        add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()" always;
-        add_header Cross-Origin-Opener-Policy "same-origin" always;
+        limit_req zone=edge_api burst=60 nodelay;
+        proxy_pass http://web;
         # Enable once served over HTTPS (see docs/deployment.md):
         # add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
     }

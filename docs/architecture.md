@@ -7,14 +7,15 @@ private Keycloak. This page explains how a request travels, where each responsib
 
 | Container | Network | Role | Public? |
 |---|---|---|---|
-| `nginx` | edge | Serves the SPA, security headers, edge rate limits, proxies `/api`, `/oauth2`, `/login/oauth2`, `/auth` to the BFF | **yes (:8080)** |
+| `nginx` | edge + web | Edge rate limits; pages → `frontend`; `/api`, `/oauth2`, `/login/oauth2`, `/auth` → BFF | **yes (:8080)** |
+| `frontend` | web | Next.js server: renders pages, sets the per-request nonce CSP. No route to the BFF, Keycloak or any data store | no |
 | `backend` | edge + app-net + identity-net | The BFF: OAuth client, API, Keycloak proxy, event producer/consumer | no |
 | `postgres` | app-net | App database (`superapp`), schema owned by Flyway | no |
 | `redis` | app-net | Revocation markers, refresh single-flight, rate-limit buckets | no |
 | `kafka` | app-net | App KRaft broker; topics declared by the BFF at startup (auto-create off) | no |
 | `keycloak` | identity-net + keycloak-db | Identity provider (realm `superapp`), runs on Temurin 25 | no |
 | `keycloak-postgres` | keycloak-db | Keycloak's own database; only Keycloak can reach it | no |
-| `keycloak-kafka` | identity-net | Keycloak's own KRaft broker, carries `keycloak.events` only | no |
+| `keycloak-kafka` | identity-net | Keycloak's own KRaft broker, carries `keycloak.events` only (created by Keycloak's event extension at startup; auto-create off) | no |
 | `mailpit` | identity-net | Dev SMTP sink for Keycloak (replace with a real SMTP relay in production) | no |
 
 The app and Keycloak share no data store: each has its own Postgres and Kafka, so a migration, outage or load spike on
@@ -39,7 +40,7 @@ No `HttpSession` exists anywhere, so any BFF instance can serve any request.
 ### Sign-in
 
 ```
-SPA ──(full-page nav)──► /oauth2/authorization/keycloak?returnTo=/app&screen=register|idp=google|action=…
+App ──(full-page nav)──► /oauth2/authorization/keycloak?returnTo=/app&screen=register|idp=google|action=…
 BFF  builds the request (PKCE S256, nonce, allow-listed extras) → encrypted __Host-sa_ar cookie
      302 → /auth/realms/superapp/protocol/openid-connect/auth?…            (same origin, through the BFF proxy)
 Keycloak renders the themed page (Keycloakify) … user signs in / registers / does MFA …
@@ -54,7 +55,7 @@ entry point can't be abused as an open redirect or for parameter injection.
 ### Every API call
 
 ```
-SPA fetch /api/v1/… (cookies + X-XSRF-TOKEN on writes)
+Browser fetch /api/v1/… (cookies + X-XSRF-TOKEN on writes)
   → RequestIdFilter → CsrfFilter (+ CSRF_VERIFIED gate) → TokenRefreshFilter → BearerTokenAuthenticationFilter
   → RateLimitFilter → controller
 ```
@@ -99,10 +100,10 @@ Keycloak uses **split-horizon URLs**: tokens are issued for `${PUBLIC_URL}/auth/
 
 ```
 com.superapp
-├── shared      crypto, web (problems, request id), config (Jackson, Kafka topics, clock, API versioning), outbox
+├── shared      crypto, web (problems, request id), config (Jackson, Kafka topics, OpenAPI, API versioning)
 ├── auth        BFF security: chains, cookies, OAuth client, token refresh, revocation, rate limits, Keycloak proxy
 ├── identity    Keycloak Admin API client (@HttpExchange), Keycloak events consumer, account endpoints
-├── user        local user projection (app_user), /me
+├── user        local user projection (app_user), /me, nightly reconciliation with Keycloak
 └── admin       admin overview and user management (role admin)
 ```
 
@@ -116,8 +117,6 @@ Rules (enforced by `ArchitectureTest` with ArchUnit, not by Spring Modulith):
 ### Events
 
 ```
-YourService (tx) ──► Outbox.publish(topic, key, event) ──same transaction──► outbox_event (jsonb)
-OutboxRelay (@Scheduled, FOR UPDATE SKIP LOCKED) ──► app kafka <your topic> ──► your @KafkaListener
 Keycloak ──► SPI superapp-kafka (after commit) ──► keycloak-kafka keycloak.events ──► KeycloakEventsListener ──► revocation + IdentityEvent
 ```
 
@@ -127,6 +126,17 @@ Keycloak ──► SPI superapp-kafka (after commit) ──► keycloak-kafka ke
 - Failed records retry 4 times with back-off, then go to `<topic>.DLT` on the app cluster (the BFF never writes to
   Keycloak's cluster). Unparseable JSON goes to the DLT at once.
 - Consumers read their own contract records (e.g. `IdentityEventMessage`), never the producer's classes.
+
+### User sync (Keycloak → `app_user`)
+
+Keycloak owns identity; `app_user` is a projection for joins, admin lists and erasure:
+
+1. **At sign-in**, from the verified ID token (`UserSignedIn`): race-free upsert, never resurrects an erased user.
+2. **From Keycloak's events** (Kafka): registration, profile/email changes, admin create/update/disable/delete.
+3. **Nightly** (`UserReconciliation`, `superapp.user.reconciliation.cron`, default 03:30 UTC): every local user is
+   re-read from Keycloak; profile and enabled state are copied, users gone from Keycloak are erased. One run per
+   cluster (Redis lock); aborts if the realm doesn't answer; stops after `max-erasures` (default 50) erasures.
+   Needed because Keycloak's event producer is fire-and-forget: a login never waits for Kafka.
 
 ### JSON (Jackson 3)
 
@@ -140,12 +150,12 @@ Two independent React projects (npm, each with its own lockfile and its own copy
 
 | Folder | Ships in | Notes |
 |---|---|---|
-| `frontend/` | nginx image | React Router 8 SPA, TanStack Query; talks only to `/api` on its own origin. `frontend/e2e`: Playwright against the running stack |
+| `frontend/` | `frontend` image | Next.js 16 App Router (standalone server). Server components for layouts, metadata and legal pages; client components fetch with TanStack Query from `/api` on the same origin; Zustand for client UI state. `frontend/e2e`: Playwright against the running stack |
 | `keycloakify/` | Keycloak image | Keycloakify 11; every login page re-implemented with the same design tokens |
 
-The SPA never calls Keycloak. Every auth interaction (sign in, sign up, add passkey, change password, delete account)
+Neither the browser code nor the Next.js server ever calls Keycloak or holds a token. Every auth interaction (sign in, sign up, add passkey, change password, delete account)
 is a full-page navigation to `/oauth2/authorization/keycloak?action=…`, which runs a Keycloak application-initiated
-action on a themed page and returns to the SPA.
+action on a themed page and returns to the app.
 
 ## 6. Why these choices
 
@@ -155,5 +165,4 @@ action on a themed page and returns to the SPA.
 | Encrypted cookies instead of server sessions | Stateless horizontal scaling without sticky sessions or a session store |
 | Keycloak hidden behind the BFF | One origin (no CORS, `SameSite=Lax` works), smaller attack surface, Keycloak admin never public |
 | Keycloak owns identity | Passkeys, MFA, email flows, brute-force protection and Google are solved problems; don't re-implement them |
-| Outbox instead of publishing in the request | A Kafka outage never loses an event or fails a user request |
 | Pseudo-modular monolith | Clear boundaries (tested) without distributed-system cost; a feature can be extracted later |

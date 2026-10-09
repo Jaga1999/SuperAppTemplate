@@ -1,6 +1,6 @@
-import { EyeIcon, EyeOffIcon, InfoIcon, CircleAlertIcon, CircleCheckIcon, TriangleAlertIcon } from 'lucide-react'
 import { kcSanitize } from 'keycloakify/lib/kcSanitize'
 import { useIsPasswordRevealed } from 'keycloakify/tools/useIsPasswordRevealed'
+import { CircleAlertIcon, CircleCheckIcon, EyeIcon, EyeOffIcon, InfoIcon, TriangleAlertIcon } from 'lucide-react'
 import type { ComponentProps, ReactNode } from 'react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'

@@ -47,6 +47,10 @@ a single host, or translate it to your orchestrator. Go through every item befor
 
 - [ ] Health: nginx `/nginx-health`; BFF `:9090/actuator/health/readiness` (management port stays internal).
 - [ ] Metrics: Prometheus scrapes `:9090/actuator/prometheus` (BFF) and `:9000/auth/metrics` (Keycloak).
+- [ ] API docs: served on the BFF port at `/swagger-ui.html` and `/v3/api-docs`, which nginx never routes. Set
+      `API_DOCS_ENABLED=false` to turn them off entirely; never expose the BFF port itself.
+- [ ] Capacity: `instances × DB_POOL_MAX_SIZE` (default 20) stays below Postgres `max_connections` (100 in compose).
+- [ ] Email: point `SMTP_*` at a real relay (both Keycloak and the BFF use it); remove Mailpit.
 - [ ] Logs: the `docker` profile emits ECS JSON with request ids; ship them to your log store.
 - [ ] Rate limits reviewed for real traffic (`infra/nginx/nginx.conf`, `superapp.bff.rate-limit.*`).
 - [ ] Run the e2e suite against staging: `E2E_BASE_URL=https://staging.example.com npm --prefix frontend run e2e`

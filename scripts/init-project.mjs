@@ -1,9 +1,20 @@
 #!/usr/bin/env node
-// Turns this template into your own project, in place. Run once, right after cloning:
+// Turns this template into your own project.
 //
-//   node scripts/init-project.mjs <project-name> [--package com.example.app] [--fresh-git] [--dry-run]
+//   node scripts/init-project.mjs [project-name] [destination] [--package com.example.app] [--fresh-git] [--dry-run]
 //
-// <project-name>   e.g. "acme-shop", "AcmeShop" or "Acme Shop" (letters, digits, spaces, - or _)
+// In place (no destination): converts this checkout itself, then renames its folder. Run it on a fresh clone.
+//   node scripts/init-project.mjs "Acme Shop" --fresh-git
+// Into a new folder (destination given): copies the template there (including your .env, docs and the agent setup:
+// .agent/, .claude/, .mcp.json) and converts only the copy. This checkout stays untouched, so one local template can
+// create any number of projects.
+//   node scripts/init-project.mjs "Acme Shop" ../acme-shop --fresh-git
+//   node scripts/init-project.mjs ../acme-shop --fresh-git          (name taken from the folder name)
+//
+// project-name     e.g. "acme-shop", "AcmeShop" or "Acme Shop" (letters, digits, spaces, - or _). Optional when a
+//                  destination is given (defaults to its folder name); required in place.
+// destination      a path: contains / or \ or starts with . (./acme-shop, ../acme-shop, C:\code\acme-shop).
+//                  Must not exist yet (or be empty) and must be outside this template.
 // --package        Java base package (default: com.<name without separators>, e.g. com.acmeshop)
 // --fresh-git      delete the template's git history and start a new repository with one initial commit
 // --dry-run        print what would change, touch nothing
@@ -15,23 +26,24 @@
 //   SUPERAPP → ACME_SHOP     environment variables
 //   com.superapp → --package Java packages of the backend and the Keycloak extensions
 //   database name/user       acme_shop (underscores: no quoting needed in SQL)
-// Finally the project folder itself is renamed to <project-name> (kebab-case).
+// In place, the project folder itself is finally renamed to <project-name> (kebab-case).
 // Needs Node 22+ only; no dependencies.
 
 import { execFileSync } from 'node:child_process'
+import { randomBytes } from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
 
 const TEMPLATE = 'superapp'
-const SKIP_DIRS = new Set(['.git', 'node_modules', 'build', 'dist', 'dist_keycloak', '.gradle', 'out', '.idea',
+const SKIP_DIRS = new Set(['.git', 'node_modules', 'build', 'dist', 'dist_keycloak', '.next', '.gradle', 'out', '.idea',
   'playwright-report', 'test-results'])
 const JAVA_KEYWORDS = new Set(('abstract assert boolean break byte case catch char class const continue default do ' +
   'double else enum extends final finally float for goto if implements import instanceof int interface long native ' +
   'new package private protected public return short static strictfp super switch synchronized this throw throws ' +
   'transient try void volatile while true false null var record yield sealed permits _').split(' '))
 
-const root = path.resolve(import.meta.dirname, '..')
-const scriptPath = path.relative(root, import.meta.filename).split(path.sep).join('/')
+const templateRoot = path.resolve(import.meta.dirname, '..')
+const scriptPath = path.relative(templateRoot, import.meta.filename).split(path.sep).join('/')
 
 function fail(message) {
   console.error(`\n✖ ${message}\n`)
@@ -47,17 +59,41 @@ const packageArg = (() => {
   return args.find((a) => a.startsWith('--package='))?.slice('--package='.length)
 })()
 const positional = args.filter((a, i) => !a.startsWith('--') && args[i - 1] !== '--package')
-if (positional.length !== 1 || flags.has('--help')) {
-  console.log('Usage: node scripts/init-project.mjs <project-name> [--package com.example.app] [--fresh-git] [--dry-run]')
-  process.exit(positional.length === 1 ? 0 : 1)
+// Project names never contain path characters, so anything path-like is the destination.
+const isPath = (a) => /[\\/]/.test(a) || a.startsWith('.')
+const nameArg = positional.find((a) => !isPath(a))
+const destinationArg = positional.find(isPath)
+const usage = 'Usage: node scripts/init-project.mjs [project-name] [destination] [--package com.example.app] [--fresh-git] [--dry-run]'
+if (flags.has('--help')) {
+  console.log(usage)
+  process.exit(0)
 }
+if (positional.length > 2 || positional.filter(isPath).length > 1 || positional.filter((a) => !isPath(a)).length > 1) {
+  fail(`Expected at most one project name and one destination.\n  ${usage}`)
+}
+if (!nameArg && !destinationArg) fail(`Give a project name, a destination, or both.\n  ${usage}`)
 const dryRun = flags.has('--dry-run')
 const freshGit = flags.has('--fresh-git')
 
+// ── Destination ──────────────────────────────────────────────────────────────
+const destination = destinationArg ? path.resolve(destinationArg) : null
+if (destination) {
+  const fromTemplate = path.relative(templateRoot, destination)
+  if (!fromTemplate || (!fromTemplate.startsWith('..') && !path.isAbsolute(fromTemplate))) {
+    fail(`The destination must be outside this template (${templateRoot}).`)
+  }
+  if (fs.existsSync(destination) && fs.readdirSync(destination).length > 0) {
+    fail(`${destination} already exists and is not empty.`)
+  }
+}
+// Dry runs only read, so in destination mode they inspect the template itself.
+const root = destination && !dryRun ? destination : templateRoot
+
 // ── Name variants ────────────────────────────────────────────────────────────
-const input = positional[0].trim()
+const input = (nameArg ?? path.basename(destination)).trim()
 if (!/^[A-Za-z][A-Za-z0-9 _-]*$/.test(input)) {
-  fail(`"${input}" is not a valid project name: start with a letter; use letters, digits, spaces, - or _.`)
+  fail(`"${input}" is not a valid project name: start with a letter; use letters, digits, spaces, - or _.` +
+    (nameArg ? '' : ' Pass the name explicitly before the destination.'))
 }
 const words = input
   .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
@@ -85,12 +121,12 @@ for (const segment of javaPackage.split('.')) {
 }
 
 // ── Guard: run once, on an untouched template ───────────────────────────────
-const templateJava = path.join(root, 'backend/src/main/java/com', TEMPLATE)
+const templateJava = path.join(templateRoot, 'backend/src/main/java/com', TEMPLATE)
 if (!fs.existsSync(templateJava)) {
-  fail(`This project has already been initialised (${path.relative(root, templateJava)} not found).`)
+  fail(`This project has already been initialised (${path.relative(templateRoot, templateJava)} not found).`)
 }
 
-console.log(`\nInitialising "${input}"${dryRun ? ' (dry run)' : ''}`)
+console.log(`\nInitialising "${input}" ${destination ? `in ${destination}` : 'in place'}${dryRun ? ' (dry run)' : ''}`)
 console.table({
   'folder / realm / ids': name.kebab,
   'classes / UI name': name.pascal,
@@ -98,6 +134,17 @@ console.table({
   'Java package': javaPackage,
   'database name/user': name.snake,
 })
+
+// ── Copy (destination mode) ─────────────────────────────────────────────────
+// Everything except git history, build output and dependencies: sources, docs, .env (renamed below, git-ignored),
+// agent setup (.agent/ guardrails and rules, .claude/ settings and skills, .mcp.json, AGENTS.md, CLAUDE.md).
+if (destination && !dryRun) {
+  fs.cpSync(templateRoot, destination, {
+    recursive: true,
+    filter: (source) => source === templateRoot || !SKIP_DIRS.has(path.basename(source)),
+  })
+  console.log(`✔ Copied the template to ${destination}`)
+}
 
 // ── Content replacement ─────────────────────────────────────────────────────
 const rules = [
@@ -140,7 +187,7 @@ for (const file of walk(root)) {
     if (!dryRun) fs.writeFileSync(file, after)
   }
 }
-console.log(`✔ Updated ${changedFiles} files`)
+console.log(`✔ ${dryRun ? 'Would update' : 'Updated'} ${changedFiles} files`)
 
 // ── File and folder names ───────────────────────────────────────────────────
 function move(from, to) {
@@ -186,6 +233,43 @@ for (const from of collectNamed(root).sort((a, b) => b.length - a.length)) {
   move(from, path.join(path.dirname(from), base))
 }
 
+// ── .env: every key from .env.example, real secrets instead of CHANGE_ME ────
+// Keeps your values; adds keys the template gained since your .env was written; creates .env if there is none.
+function secretFor(key) {
+  // The cookie key must decode to exactly 32 bytes; everything else is an opaque random string.
+  return key === 'BFF_COOKIE_ENCRYPTION_KEY' ? randomBytes(32).toString('base64') : randomBytes(32).toString('base64url')
+}
+const envPath = path.join(root, '.env')
+const examplePath = path.join(root, '.env.example')
+if (fs.existsSync(examplePath)) {
+  const keyOf = (line) => /^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=/.exec(line)?.[1]
+  const existing = fs.existsSync(envPath) ? fs.readFileSync(envPath, 'utf8') : null
+  const present = new Set((existing ?? '').split(/\r?\n/).map(keyOf).filter(Boolean))
+  const added = []
+  const lines = []
+  for (const line of fs.readFileSync(examplePath, 'utf8').split(/\r?\n/)) {
+    const key = keyOf(line)
+    if (existing !== null && (!key || present.has(key))) continue
+    const value = key ? line.slice(line.indexOf('=') + 1) : null
+    lines.push(key && value.includes('CHANGE_ME') ? `${key}=${secretFor(key)}` : line)
+    if (key) added.push(key)
+  }
+  if (existing === null) {
+    if (!dryRun) fs.writeFileSync(envPath, lines.join('\n'))
+    console.log(`✔ ${dryRun ? 'Would create' : 'Created'} .env from .env.example with generated secrets`)
+  } else if (added.length > 0) {
+    const block = `\n\n# Added by init-project from .env.example (new in the template)\n${lines.join('\n')}\n`
+    if (!dryRun) fs.writeFileSync(envPath, existing.replace(/\s*$/, '') + block)
+    console.log(`✔ ${dryRun ? 'Would add' : 'Added'} to .env: ${added.join(', ')}`)
+  }
+}
+
+// The realm name is part of Google's redirect URI, so a renamed project needs it registered on the OAuth client.
+const publicUrl = fs.existsSync(envPath)
+  ? (/^PUBLIC_URL=(.*)$/m.exec(fs.readFileSync(envPath, 'utf8'))?.[1]?.trim() ?? 'http://localhost:8080')
+  : 'http://localhost:8080'
+const googleRedirectUri = `${publicUrl}/auth/realms/${name.kebab}/broker/google/endpoint`
+
 // ── Template-only bits ──────────────────────────────────────────────────────
 const readme = path.join(root, 'README.md')
 if (fs.existsSync(readme) && !dryRun) {
@@ -212,7 +296,7 @@ if (freshGit && !dryRun) {
 // ── Project folder ──────────────────────────────────────────────────────────
 let finalRoot = root
 const target = path.join(path.dirname(root), name.kebab)
-if (path.basename(root) !== name.kebab) {
+if (!destination && path.basename(root) !== name.kebab) {
   if (fs.existsSync(target)) {
     console.log(`! ${target} already exists; the folder was not renamed.`)
   } else if (!dryRun) {
@@ -233,10 +317,18 @@ if (path.basename(root) !== name.kebab) {
 console.log(`
 Done. Next steps:
   cd "${finalRoot}"
-  cp .env.example .env            # then change every CHANGE_ME value
+${fs.existsSync(path.join(finalRoot, '.env'))
+    ? '  review .env                     # copied from the template and renamed; use new secrets for a new product'
+    : '  cp .env.example .env            # then change every CHANGE_ME value'}
   docker compose up -d --build --wait
-  then browse to http://localhost:8080
-${freshGit ? '' : `
+  then browse to ${publicUrl}
+
+Google sign-in: add this redirect URI to your Google OAuth client (Cloud Console → Credentials), or Google answers
+"redirect_uri_mismatch":
+  ${googleRedirectUri}
+${freshGit ? '' : destination ? `
+No git repository was created. Pass --fresh-git next time, or run:  git init
+` : `
 The git history still belongs to the template. Either re-run on a fresh clone with --fresh-git, or point
 "origin" at your own repository:  git remote set-url origin <your-repo-url>
 `}`)

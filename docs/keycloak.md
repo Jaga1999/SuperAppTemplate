@@ -24,7 +24,7 @@ import time.
 |---|---|
 | Clients | `superapp-bff`: confidential, standard flow only, PKCE S256, exact redirect URIs, back-channel logout to `http://backend:8081/api/auth/backchannel-logout`, `fullScopeAllowed: false` with an audience mapper |
 | | `superapp-admin-api`: service account only, `realm-management` roles `view-users`, `manage-users`, `query-users` **scoped to the client** (`clientScopeMappings`; required because `fullScopeAllowed` is false) |
-| Roles | `user` (default), `premium`, `admin`; groups `Admins` and `Premium` |
+| Roles | `user` (default) and `admin`; group `Admins` grants `admin` |
 | Tokens | access 5 min; SSO idle 30 min, max 10 h; refresh tokens rotate with zero reuse |
 | Registration | email as username, email verification, versioned legal consent (`superapp-legal-consent`) |
 | Passwords | 12–128 chars, upper, lower, digit, not username or email, history 5 |

@@ -134,10 +134,6 @@
         "description": "Every signed-up account"
       },
       {
-        "name": "premium",
-        "description": "Unlocks premium features (priorities, due dates, unlimited todos)"
-      },
-      {
         "name": "admin",
         "description": "Access to the admin console of the app"
       },
@@ -166,15 +162,7 @@
       "name": "Admins",
       "path": "/Admins",
       "realmRoles": [
-        "admin",
-        "premium"
-      ]
-    },
-    {
-      "name": "Premium",
-      "path": "/Premium",
-      "realmRoles": [
-        "premium"
+        "admin"
       ]
     }
   ],
@@ -273,7 +261,6 @@
       "client": "superapp-bff",
       "roles": [
         "user",
-        "premium",
         "admin"
       ]
     }
@@ -319,27 +306,6 @@
       ],
       "groups": [
         "/Admins"
-      ],
-      "realmRoles": [
-        "default-roles-superapp"
-      ]
-    },
-    {
-      "username": "premium@superapp.local",
-      "email": "premium@superapp.local",
-      "firstName": "Pia",
-      "lastName": "Premium",
-      "enabled": true,
-      "emailVerified": true,
-      "credentials": [
-        {
-          "type": "password",
-          "value": "${SEED_USER_PASSWORD}",
-          "temporary": false
-        }
-      ],
-      "groups": [
-        "/Premium"
       ],
       "realmRoles": [
         "default-roles-superapp"

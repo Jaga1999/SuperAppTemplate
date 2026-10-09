@@ -7,25 +7,20 @@ import org.jspecify.annotations.Nullable;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
- * Wire contract of the {@code keycloak.events} topic, produced by the Keycloak SPI in
- * {@code keycloak/extensions/superapp-extensions} ({@code com.superapp.keycloak.events.IdentityEventMessage}).
- * Keep both in sync.
+ * The fields of the {@code keycloak.events} wire contract this consumer reads. Produced by the Keycloak SPI in
+ * {@code keycloak/extensions/superapp-extensions} ({@code com.superapp.keycloak.events.IdentityEventMessage}), which
+ * sends more; unknown fields are ignored. Keep the names in sync.
  */
 record IdentityEventMessage(
-        @JsonProperty(required = true) String id,
         @JsonProperty(required = true) String kind,
         @JsonProperty(required = true) String type,
         @JsonProperty(required = true) String realmName,
-        @Nullable String clientId,
         @Nullable String userId,
         @Nullable String sessionId,
-        @Nullable String ipAddress,
-        @Nullable String error,
         @Nullable String resourceType,
         @Nullable String resourcePath,
         @Nullable String representation,
-        @Nullable Map<String, String> details,
-        long time) {
+        @Nullable Map<String, String> details) {
 
     boolean isUserEvent() {
         return "USER".equals(kind);

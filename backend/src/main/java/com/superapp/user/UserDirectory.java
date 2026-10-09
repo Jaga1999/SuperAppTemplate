@@ -1,6 +1,7 @@
 package com.superapp.user;
 
 import java.time.Instant;
+import java.util.Optional;
 import java.util.UUID;
 
 import org.jspecify.annotations.Nullable;
@@ -15,6 +16,8 @@ public interface UserDirectory {
     }
 
     Page<UserSummary> list(Pageable pageable);
+
+    Optional<UserSummary> find(UUID id);
 
     long countActive();
 

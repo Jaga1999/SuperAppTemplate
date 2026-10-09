@@ -23,7 +23,7 @@ export class ApiError extends Error {
     this.problem = problem
   }
 
-  /** Last path segment of the problem type, e.g. "premium-required". */
+  /** Last path segment of the problem type, e.g. "session-not-found". */
   get slug(): string {
     return this.problem.type?.split('/').pop() ?? 'unknown'
   }

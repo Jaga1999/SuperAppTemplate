@@ -1,3 +1,5 @@
+'use client'
+
 import { MonitorIcon, MoonIcon, SunIcon } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { Button } from '@/components/ui/button'

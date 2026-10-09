@@ -15,7 +15,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
  * <p>Single-module monolith, packaged by feature. Each direct sub-package owns one concern and keeps its
  * implementation in an {@code internal} sub-package; other features use only the top-level (public) types:
  * <ul>
- *   <li>{@code shared}   – cross-cutting kernel (crypto, errors, outbox, web config)</li>
+ *   <li>{@code shared}   – cross-cutting kernel (crypto, errors, web config)</li>
  *   <li>{@code auth}     – BFF security: Keycloak login, cookie tokens, refresh, revocation, rate limits, /auth proxy</li>
  *   <li>{@code identity} – Keycloak Admin API + Keycloak event stream (Kafka)</li>
  *   <li>{@code user}     – local projection of Keycloak users</li>

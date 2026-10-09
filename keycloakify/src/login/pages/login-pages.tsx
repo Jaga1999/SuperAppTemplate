@@ -6,8 +6,8 @@ import { FingerprintIcon, KeyRoundIcon } from 'lucide-react'
 import { useState } from 'react'
 import { CheckboxField, Divider, Field, PasswordInput, SubmitButton, TextInput, TextLink } from '../components/kc-ui'
 import Template from '../Template'
-import { PasskeyConditionalUi, type PageProps, RegisterLink, SocialProviders, WebauthnHiddenForm } from './shared'
 import { usernameLabel } from './labels'
+import { type PageProps, PasskeyConditionalUi, RegisterLink, SocialProviders, WebauthnHiddenForm } from './shared'
 
 const PASSKEY_BUTTON = 'authenticateWebAuthnButton'
 

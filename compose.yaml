@@ -1,6 +1,7 @@
 # SuperApp: production-shaped stack.
 #   Only nginx is published. Everything else lives on private networks.
 #   The app and Keycloak each get their own Postgres and Kafka, so neither can read or break the other's data:
+#     web          : nginx ↔ frontend (Next.js renders pages; it has no route to the BFF or Keycloak)
 #     app-net      : backend ↔ postgres, redis, kafka               (app data)
 #     identity-net : backend ↔ keycloak ↔ keycloak-kafka, mailpit   (identity traffic)
 #     keycloak-db  : keycloak ↔ keycloak-postgres                   (only Keycloak reaches its database)
@@ -9,8 +10,40 @@
 
 name: superapp
 
+# Every service: restart policy, bounded json logs, no privilege escalation (setuid binaries can't gain rights).
 x-restart: &restart
   restart: unless-stopped
+  logging:
+    driver: json-file
+    options: { max-size: "10m", max-file: "3" }
+  security_opt: ["no-new-privileges:true"]
+
+# Postgres sized for its container (1 GiB): ~25% shared_buffers, planner told about the page cache, slow-query log,
+# and guards that kill stuck transactions/locks instead of letting them pile up.
+x-postgres-command: &postgres-command
+  - postgres
+  - -c
+  - shared_buffers=256MB
+  - -c
+  - effective_cache_size=768MB
+  - -c
+  - work_mem=8MB
+  - -c
+  - maintenance_work_mem=64MB
+  - -c
+  - max_connections=100
+  - -c
+  - random_page_cost=1.1
+  - -c
+  - wal_compression=on
+  - -c
+  - idle_in_transaction_session_timeout=60s
+  - -c
+  - lock_timeout=10s
+  - -c
+  - log_min_duration_statement=500ms
+  - -c
+  - password_encryption=scram-sha-256
 
 services:
   # ── Edge ───────────────────────────────────────────────────────────────────
@@ -22,12 +55,17 @@ services:
     image: superapp/nginx:local
     environment:
       BACKEND_UPSTREAM: backend:8081
+      FRONTEND_UPSTREAM: frontend:3000
     ports:
       - "8080:8080"
     depends_on:
       backend:
         condition: service_healthy
-    networks: [edge]
+      frontend:
+        condition: service_healthy
+    networks: [edge, web]
+    cap_drop: [ALL]
+    mem_limit: 128m
     read_only: true
     # Read-only root FS; writable scratch space owned by the unprivileged nginx user (uid 101).
     tmpfs:
@@ -40,6 +78,23 @@ services:
       interval: 10s
       timeout: 3s
       retries: 5
+
+  # ── Product app (Next.js): renders pages only ───────────────────────────────
+  frontend:
+    <<: *restart
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    image: superapp/frontend:local
+    environment:
+      PUBLIC_URL: ${PUBLIC_URL}   # canonical URLs, sitemap, Open Graph
+    networks: [web]
+    cap_drop: [ALL]
+    mem_limit: 512m
+    read_only: true
+    tmpfs:
+      - /app/.next/cache:uid=10001,gid=10001,mode=0700
+      - /tmp:uid=10001,gid=10001,mode=0700
 
   # ── BFF (the only thing that talks to Keycloak) ─────────────────────────────
   backend:
@@ -77,6 +132,11 @@ services:
       keycloak:
         condition: service_healthy
     networks: [edge, app-net, identity-net]
+    cap_drop: [ALL]
+    mem_limit: 1g
+    read_only: true
+    tmpfs:
+      - /tmp:uid=10001,gid=10001,mode=0700   # Tomcat work dir and JVM temp files
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:9090/actuator/health/readiness | grep -q UP || exit 1"]
       interval: 10s
@@ -114,6 +174,9 @@ services:
       KC_DB_URL: jdbc:postgresql://keycloak-postgres:5432/${KEYCLOAK_DB_NAME}
       KC_DB_USERNAME: ${KEYCLOAK_DB_USER}
       KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD}
+      KC_DB_POOL_INITIAL_SIZE: "5"
+      KC_DB_POOL_MIN_SIZE: "5"
+      KC_DB_POOL_MAX_SIZE: "20"
       # Browsers only ever reach Keycloak through nginx → BFF → /auth/**
       KC_HOSTNAME: ${PUBLIC_URL}/auth
       KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
@@ -131,6 +194,8 @@ services:
       keycloak-kafka:
         condition: service_healthy
     networks: [identity-net, keycloak-db]
+    cap_drop: [ALL]
+    mem_limit: 1536m
     healthcheck:
       test:
         - CMD-SHELL
@@ -151,6 +216,9 @@ services:
   keycloak-postgres:
     <<: *restart
     image: postgres:18.6
+    command: *postgres-command
+    shm_size: 256m
+    mem_limit: 1g
     environment:
       POSTGRES_PASSWORD: ${KEYCLOAK_POSTGRES_SUPERUSER_PASSWORD}
       DB_NAME: ${KEYCLOAK_DB_NAME}
@@ -166,8 +234,8 @@ services:
       timeout: 3s
       retries: 30
 
-  # Carries Keycloak's event stream only (topic keycloak.events). Auto-create is on because the broker is dedicated to
-  # that one topic: whichever of Keycloak (producer) or the BFF (consumer) connects first creates it with these defaults.
+  # Carries Keycloak's event stream only (topic keycloak.events). Keycloak's event extension creates the topic at startup
+  # (before the BFF subscribes); auto-create stays off so no client can create stray topics.
   keycloak-kafka:
     <<: *restart
     image: apache/kafka:4.3.1
@@ -181,9 +249,7 @@ services:
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@keycloak-kafka:9093
-      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
-      KAFKA_NUM_PARTITIONS: 3
-      KAFKA_LOG_RETENTION_HOURS: 168
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
@@ -191,6 +257,9 @@ services:
       KAFKA_SHARE_COORDINATOR_STATE_TOPIC_MIN_ISR: 1
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
       KAFKA_LOG_DIRS: /var/lib/kafka/data
+      KAFKA_HEAP_OPTS: "-Xms256m -Xmx512m"
+    cap_drop: [ALL]
+    mem_limit: 1g
     volumes:
       - keycloak-kafka-data:/var/lib/kafka/data
     networks: [identity-net]
@@ -205,6 +274,9 @@ services:
   postgres:
     <<: *restart
     image: postgres:18.6
+    command: *postgres-command
+    shm_size: 256m
+    mem_limit: 1g
     environment:
       POSTGRES_PASSWORD: ${APP_POSTGRES_SUPERUSER_PASSWORD}
       DB_NAME: ${APP_DB_NAME}
@@ -219,6 +291,7 @@ services:
   redis:
     <<: *restart
     image: redis:8.10.2
+    mem_limit: 512m
     command: ["redis-server", "--requirepass", "${REDIS_PASSWORD}", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
     volumes:
       - redis-data:/data
@@ -253,6 +326,9 @@ services:
       KAFKA_SHARE_COORDINATOR_STATE_TOPIC_MIN_ISR: 1
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
       KAFKA_LOG_DIRS: /var/lib/kafka/data
+      KAFKA_HEAP_OPTS: "-Xms256m -Xmx512m"
+    cap_drop: [ALL]
+    mem_limit: 1g
     volumes:
       - kafka-data:/var/lib/kafka/data
     networks: [app-net]
@@ -264,7 +340,10 @@ services:
     environment:
       MP_SMTP_AUTH_ACCEPT_ANY: "true"
       MP_SMTP_AUTH_ALLOW_INSECURE: "true"
+      MP_MAX_MESSAGES: "1000"
+    # Dev SMTP sink for Keycloak's identity mail (verification, reset, alerts). Production: a real relay via SMTP_*.
     networks: [identity-net]
+    mem_limit: 128m
 
 volumes:
   postgres-data:
@@ -275,6 +354,7 @@ volumes:
 
 networks:
   edge:
+  web:
   app-net:
   identity-net:
   keycloak-db:

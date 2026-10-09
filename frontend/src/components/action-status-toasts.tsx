@@ -1,6 +1,9 @@
+'use client'
+
 import { useQueryClient } from '@tanstack/react-query'
+import type { Route } from 'next'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useEffect } from 'react'
-import { useLocation, useNavigate } from 'react-router'
 import { toast } from 'sonner'
 
 const authErrors: Record<string, string> = {
@@ -17,12 +20,13 @@ const authErrors: Record<string, string> = {
  * Show a toast once, refresh affected data, then clean the URL.
  */
 export function ActionStatusToasts() {
-  const { search, pathname } = useLocation()
-  const navigate = useNavigate()
+  const searchParams = useSearchParams()
+  const pathname = usePathname()
+  const router = useRouter()
   const qc = useQueryClient()
 
   useEffect(() => {
-    const params = new URLSearchParams(search)
+    const params = new URLSearchParams(searchParams.toString())
     const action = params.get('action')
     const authError = params.get('auth_error')
     const signedOut = params.get('signed_out')
@@ -43,8 +47,8 @@ export function ActionStatusToasts() {
     params.delete('auth_error')
     params.delete('signed_out')
     const rest = params.toString()
-    navigate({ pathname, search: rest ? `?${rest}` : '' }, { replace: true })
-  }, [search, pathname, navigate, qc])
+    router.replace(`${pathname}${rest ? `?${rest}` : ''}` as Route, { scroll: false })
+  }, [searchParams, pathname, router, qc])
 
   return null
 }
