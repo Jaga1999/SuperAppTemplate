@@ -1,0 +1,147 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# SuperApp BFF. Defaults target `docker compose up` with the backend run from the IDE
+# (services on localhost via compose.override.yaml). The `docker` profile overrides for in-container runs.
+# Every secret comes from the environment (.env). Nothing secret is committed.
+# ─────────────────────────────────────────────────────────────────────────────
+spring:
+  application:
+    name: superapp-backend
+  cloud:
+    gateway:
+      server:
+        webmvc:
+          # Keycloak must see the browser's IP/host/scheme (sessions page, events, emails, brute-force detection).
+          # Without trusted-proxies the gateway strips every X-Forwarded-* header. Trusting all is correct ONLY because
+          # the BFF is never exposed directly: nginx is the sole ingress and overwrites X-Forwarded-For with $remote_addr.
+          # The values are generated from the request Spring already resolved (forward-headers-strategy: framework).
+          trusted-proxies: ".*"
+          # Keycloak reads X-Forwarded-* (KC_PROXY_HEADERS=xforwarded); don't send a second, RFC 7239 "Forwarded" copy.
+          forwarded-request-headers-filter:
+            enabled: false
+  threads:
+    virtual:
+      enabled: true            # Java 25 virtual threads for Tomcat, @Scheduled, Kafka listeners
+  main:
+    keep-alive: true
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
+
+  datasource:
+    url: ${APP_DB_URL:jdbc:postgresql://localhost:5432/superapp}
+    username: ${APP_DB_USER:superapp}
+    password: ${APP_DB_PASSWORD:}
+    hikari:
+      pool-name: superapp
+      maximum-pool-size: 20
+      minimum-idle: 2
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: none           # Flyway owns the schema
+    properties:
+      hibernate:
+        jdbc.time_zone: UTC
+        timezone.default_storage: NORMALIZE_UTC
+  flyway:
+    locations: classpath:db/migration
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: 6379
+      password: ${REDIS_PASSWORD:}
+      timeout: 2s
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9094}
+    producer:
+      acks: all
+      properties:
+        enable.idempotence: true
+        linger.ms: 5
+    consumer:
+      auto-offset-reset: earliest
+      properties:
+        isolation.level: read_committed
+    listener:
+      ack-mode: record
+      observation-enabled: true
+
+  mvc:
+    problemdetails:
+      enabled: true
+
+server:
+  port: 8081
+  forward-headers-strategy: framework   # trust nginx's X-Forwarded-* (nginx is the only ingress)
+  shutdown: graceful
+  # Keycloak's own session cookies (several JWTs) + our encrypted token cookies travel together on /auth/** requests.
+  max-http-request-header-size: 32KB
+  error:
+    include-stacktrace: never
+    include-message: never
+
+management:
+  server:
+    port: 9090                          # never exposed by nginx
+  endpoints:
+    web:
+      exposure:
+        include: health, info, prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+  observations:
+    key-values:
+      application: superapp-backend
+
+logging:
+  level:
+    root: info
+    com.superapp: info
+  pattern:
+    correlation: "[%X{requestId:-}] "
+
+superapp:
+  bff:
+    public-url: ${PUBLIC_URL:http://localhost:8080}
+    encryption-key: ${BFF_COOKIE_ENCRYPTION_KEY:}
+    default-return-path: /app
+    revocation-ttl: PT15M
+    cookies:
+      secure: ${BFF_COOKIE_SECURE:true}
+    keycloak:
+      internal-url: ${KEYCLOAK_INTERNAL_URL:http://localhost:8180/auth}
+      realm: ${KEYCLOAK_REALM:superapp}
+      client-id: ${SUPERAPP_BFF_CLIENT_ID:superapp-bff}
+      client-secret: ${SUPERAPP_BFF_CLIENT_SECRET:}
+      admin-client-id: ${SUPERAPP_ADMIN_CLIENT_ID:superapp-admin-api}
+      admin-client-secret: ${SUPERAPP_ADMIN_CLIENT_SECRET:}
+    rate-limit:
+      enabled: true
+      reads-per-minute: 300
+      writes-per-minute: 60
+      auth-per-minute: 20
+      login-pages-per-minute: 60
+  identity:
+    google-login-enabled: ${SUPERAPP_GOOGLE_LOGIN_ENABLED:false}
+  kafka:
+    topics:
+      keycloak-events: keycloak.events
+      todo-events: superapp.todo.events
+  todo:
+    free-open-limit: 25
+  outbox:
+    poll-interval: PT0.5S
+
+---
+spring:
+  config:
+    activate:
+      on-profile: docker
+logging:
+  structured:
+    format:
+      console: ecs

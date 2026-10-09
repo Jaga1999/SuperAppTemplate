@@ -1,0 +1,93 @@
+# Rendered by the nginx image entrypoint (envsubst) into /etc/nginx/conf.d/superapp.conf.
+# ${BACKEND_UPSTREAM} → the Spring BFF. nginx never talks to Keycloak directly.
+
+upstream bff {
+    server ${BACKEND_UPSTREAM};
+    keepalive 64;
+}
+
+server {
+    listen 8080;
+    server_name _;
+
+    root /usr/share/nginx/html;
+    limit_conn edge_conn 50;
+
+    # ── Shared proxy settings ───────────────────────────────────────────────
+    proxy_http_version 1.1;
+    proxy_set_header Connection "";
+    proxy_set_header Host              $http_host;
+    proxy_set_header X-Forwarded-Host  $http_host;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    # nginx is the outermost hop: overwrite, never append. Appending would let a client spoof its IP with its own
+    # X-Forwarded-For (the app reads the left-most value). Behind a cloud load balancer, use ngx_http_realip instead.
+    proxy_set_header X-Forwarded-For   $remote_addr;
+    proxy_set_header X-Real-IP         $remote_addr;
+    proxy_set_header X-Request-Id      $request_id;
+    proxy_buffer_size        32k;
+    proxy_buffers            8 32k;
+    proxy_busy_buffers_size  64k;
+    proxy_read_timeout       60s;
+    proxy_redirect           off;
+
+    location = /nginx-health {
+        access_log off;
+        default_type text/plain;
+        return 200 "ok";
+    }
+
+    # ── BFF API ──────────────────────────────────────────────────────────────
+    # Called only by Keycloak on the private network; never reachable from the internet.
+    location = /api/auth/backchannel-logout {
+        return 404;
+    }
+
+    location /api/ {
+        limit_req zone=edge_api burst=60 nodelay;
+        proxy_pass http://bff;
+    }
+
+    # ── Login start / OAuth2 callback (handled by the BFF) ─────────────────
+    location /oauth2/ {
+        limit_req zone=edge_auth burst=20 nodelay;
+        proxy_pass http://bff;
+    }
+    location /login/oauth2/ {
+        limit_req zone=edge_auth burst=20 nodelay;
+        proxy_pass http://bff;
+    }
+
+    # ── Keycloak theme assets: static files, must not eat the auth budget ──
+    location /auth/resources/ {
+        limit_req zone=edge_static burst=200 nodelay;
+        proxy_pass http://bff;
+    }
+
+    # ── Keycloak pages, proxied by the BFF through an allow-list ──────────
+    # Only page loads and form posts count here (credential stuffing protection).
+    location /auth/ {
+        limit_req zone=edge_auth burst=40 nodelay;
+        proxy_pass http://bff;
+    }
+
+    # ── SPA ──────────────────────────────────────────────────────────────────
+    location /assets/ {
+        access_log off;
+        add_header Cache-Control "public, max-age=31536000, immutable" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        try_files $uri =404;
+    }
+
+    location / {
+        try_files $uri /index.html;
+        add_header Cache-Control "no-cache" always;
+        add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://lh3.googleusercontent.com; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header X-Frame-Options "DENY" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+        add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()" always;
+        add_header Cross-Origin-Opener-Policy "same-origin" always;
+        # Enable once served over HTTPS (see docs/deployment.md):
+        # add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
+    }
+}

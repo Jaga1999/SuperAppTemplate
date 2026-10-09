@@ -1,0 +1,21 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "web-dev",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--dir", "frontend", "dev"],
+      "port": 5173
+    },
+    {
+      "name": "theme-dev",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--dir", "frontend", "dev:theme"],
+      "port": 5174
+    },
+    {
+      "name": "edge",
+      "url": "http://localhost:8080"
+    }
+  ]
+}

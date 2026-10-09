@@ -1,0 +1,32 @@
+# Dev-only conveniences. Loaded automatically by `docker compose up`.
+# Everything is bound to 127.0.0.1 so nothing leaks onto your LAN.
+# Production: run `docker compose -f compose.yaml up -d` (this file is ignored).
+
+services:
+  backend:
+    ports:
+      - "127.0.0.1:8081:8081"   # BFF (debug only; browsers must use nginx :8080)
+      - "127.0.0.1:9090:9090"   # actuator / management
+
+  keycloak:
+    environment:
+      # Admin console is NOT proxied by the BFF. Reach it only from this machine.
+      KC_HOSTNAME_ADMIN: http://localhost:8180/auth
+    ports:
+      - "127.0.0.1:8180:8080"
+
+  postgres:
+    ports:
+      - "127.0.0.1:5432:5432"
+
+  redis:
+    ports:
+      - "127.0.0.1:6379:6379"
+
+  kafka:
+    ports:
+      - "127.0.0.1:9094:9094"
+
+  mailpit:
+    ports:
+      - "127.0.0.1:8025:8025"   # inbox UI for verification / reset emails

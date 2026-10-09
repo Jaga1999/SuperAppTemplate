@@ -1,0 +1,9 @@
+**/node_modules
+**/dist
+**/dist_keycloak
+**/build
+**/.gradle
+.git
+.env
+.idea
+**/*.log

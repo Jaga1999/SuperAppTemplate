@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.superapp.keycloak.legal.LegalConsentTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-10-09T07:44:40.377Z" hostname="JAGADEEP" time="0.096">
+  <properties/>
+  <testcase name="userWhoAcceptedTheCurrentVersionsIsNeverAskedAgain()" classname="com.superapp.keycloak.legal.LegalConsentTest" time="0.038"/>
+  <testcase name="frontMatterIsParsed()" classname="com.superapp.keycloak.legal.LegalConsentTest" time="0.008"/>
+  <testcase name="changingEitherDocumentAsksAgain()" classname="com.superapp.keycloak.legal.LegalConsentTest" time="0.001"/>
+  <testcase name="missingVersionFailsLoudly()" classname="com.superapp.keycloak.legal.LegalConsentTest" time="0.004"/>
+  <testcase name="theRepositoryDocumentsAreValid()" classname="com.superapp.keycloak.legal.LegalConsentTest" time="0.004"/>
+  <testcase name="newUserMustAccept()" classname="com.superapp.keycloak.legal.LegalConsentTest" time="0.002"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -1,0 +1,16 @@
+package com.superapp.shared.config;
+
+import java.time.Clock;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+/** Inject {@link Clock} instead of calling {@code Instant.now()} in business code, so time is testable. */
+@Configuration(proxyBeanMethods = false)
+class ClockConfig {
+
+    @Bean
+    Clock clock() {
+        return Clock.systemUTC();
+    }
+}
