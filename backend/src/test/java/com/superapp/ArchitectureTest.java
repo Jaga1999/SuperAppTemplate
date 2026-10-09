@@ -22,7 +22,7 @@ import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.sli
 @AnalyzeClasses(packages = "com.superapp", importOptions = ImportOption.DoNotIncludeTests.class)
 class ArchitectureTest {
 
-    private static final String[] FEATURES = {"auth", "identity", "user", "todo", "activity", "admin"};
+    private static final String[] FEATURES = {"auth", "identity", "user", "admin"};
 
     @ArchTest
     static void internalPackagesArePrivateToTheirFeature(JavaClasses classes) {
@@ -39,8 +39,7 @@ class ArchitectureTest {
     static final ArchRule sharedKernelDependsOnNoFeature = noClasses()
             .that().resideInAPackage("com.superapp.shared..")
             .should().dependOnClassesThat().resideInAnyPackage(
-                    "com.superapp.auth..", "com.superapp.identity..", "com.superapp.user..",
-                    "com.superapp.todo..", "com.superapp.activity..", "com.superapp.admin..");
+                    "com.superapp.auth..", "com.superapp.identity..", "com.superapp.user..", "com.superapp.admin..");
 
     @ArchTest
     static final ArchRule featuresAreFreeOfCycles = slices()

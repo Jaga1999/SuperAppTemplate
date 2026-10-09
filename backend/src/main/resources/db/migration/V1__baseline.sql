@@ -20,24 +20,6 @@ create index app_user_created_at_idx on app_user (created_at desc);
 -- Not unique on purpose: Keycloak is the authority on email uniqueness; the projection may lag briefly.
 create index app_user_email_idx on app_user (lower(email));
 
--- ── Todos ───────────────────────────────────────────────────────────────────
-create table todo (
-    id            uuid primary key,                  -- UUIDv7 (time-ordered)
-    owner_id      uuid          not null,
-    title         varchar(200)  not null check (length(trim(title)) > 0),
-    notes         varchar(2000),
-    completed     boolean       not null default false,
-    completed_at  timestamptz,
-    priority      smallint      not null default 0 check (priority between 0 and 3),
-    due_date      date,
-    created_at    timestamptz   not null,
-    updated_at    timestamptz   not null,
-    version       bigint        not null default 0
-);
--- Matches the list query: owner scope, open first, importance, due date, newest.
-create index todo_owner_listing_idx on todo (owner_id, completed, priority desc, due_date, created_at desc);
-create index todo_owner_open_idx on todo (owner_id) where completed = false;
-
 -- ── Transactional outbox (relayed to Kafka by OutboxRelay) ──────────────────
 create table outbox_event (
     id            uuid primary key,
@@ -52,15 +34,3 @@ create table outbox_event (
 );
 create index outbox_event_pending_idx on outbox_event (created_at) where published_at is null;
 create index outbox_event_published_idx on outbox_event (published_at) where published_at is not null;
-
--- ── Activity feed (Kafka consumer projection; event_id = idempotency key) ───
-create table activity_entry (
-    event_id     uuid primary key,
-    owner_id     uuid         not null,
-    type         varchar(64)  not null,
-    todo_id      uuid,
-    title        varchar(200),
-    count        integer,
-    occurred_at  timestamptz  not null
-);
-create index activity_entry_owner_idx on activity_entry (owner_id, occurred_at desc);

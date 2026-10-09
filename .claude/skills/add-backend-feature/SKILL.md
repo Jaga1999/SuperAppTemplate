@@ -5,7 +5,8 @@ description: Add a new backend feature module (entity, migration, service, versi
 
 # Add a backend feature
 
-Reference implementation: the `todo` feature (`backend/src/main/java/com/superapp/todo`). Read it first, then mirror it.
+Reference implementation: the `user` feature (`backend/src/main/java/com/superapp/user`: entity, repository, public
+`UserDirectory` facade, controller, identity-event listener). Read it first, then mirror its shape.
 Rules: `.agent/rules/backend.md`, `.agent/rules/security.md`, `.agent/rules/testing.md`.
 
 ## Steps
@@ -22,8 +23,8 @@ Rules: `.agent/rules/backend.md`, `.agent/rules/security.md`, `.agent/rules/test
 5. **Events (if other features react)** — `Outbox.publish(TOPIC, ownerId, event)` inside the service transaction;
    declare topic and `.DLT` in `shared/config/KafkaTopicsConfig`; the consumer reads its own record and is idempotent.
 6. **User deletion** — if the feature stores per-user data, delete it on `IdentityEvent.UserDeleted` (see
-   `TodoAccountCleanup`).
-7. **Tests** — service unit test; API tests in the `TodoApiIntegrationTest` style (same annotations so the context is
+   `user/internal/UserProjection`).
+7. **Tests** — service unit test; API tests in the `ApiIntegrationTest` style (same annotations so the context is
    reused): happy path, 400, 401/403, CSRF on writes.
 8. **Frontend (if needed)** — use the `add-frontend-page` skill.
 

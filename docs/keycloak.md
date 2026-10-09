@@ -6,7 +6,7 @@ and runs `kc.sh build`). Everything is configuration as code:
 | Path | What |
 |---|---|
 | `keycloak/realm/superapp-realm.json` | The realm: clients, roles, groups, flows, policies, IdP, SMTP, seed users |
-| `frontend/apps/keycloak-theme` | Login theme `superapp` (Keycloakify, React, `@superapp/ui`) |
+| `keycloakify` | Login theme `superapp` (Keycloakify, React; standalone npm project) |
 | `keycloak/themes/superapp-email` | Email theme (FreeMarker, branded HTML + text) |
 | `keycloak/extensions/superapp-extensions` | Our providers (Java 25): event listener `superapp-kafka`, required action `superapp-legal-consent` |
 | `legal/*.md` | Terms and Conditions, Privacy Policy (text and `version`) |
@@ -80,10 +80,10 @@ Google rejects `prompt=create` (sent when the user starts from *Get started*) wi
 ## The login theme
 
 - Every page Keycloak can render has a themed component (`KcPage.tsx`; unknown pages fall back to a styled default).
-- Preview without Keycloak: `pnpm --dir frontend dev:theme`, then `http://localhost:5174/?kc=<page>.ftl`.
+- Preview without Keycloak: `npm --prefix keycloakify run dev`, then `http://localhost:5174/?kc=<page>.ftl`.
 - Copy and server messages are overridden in `src/login/i18n.ts` (passkey errors, Terms text, titles). Keycloakify
   writes these into the theme's message bundle, so server-rendered messages use them too.
-- The theme JAR is built inside the Keycloak image (`pnpm --filter @superapp/keycloak-theme build-keycloak-theme`).
+- The theme JAR is built inside the Keycloak image (`npm run build-keycloak-theme`).
 
 ## Kafka event-listener SPI
 

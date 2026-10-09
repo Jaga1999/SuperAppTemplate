@@ -1,4 +1,0 @@
-@import "@superapp/ui/globals.css";
-
-/* This app's own sources (the design system registers its own components). */
-@source "./";

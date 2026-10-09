@@ -17,4 +17,4 @@
 - Legal documents live in `legal/*.md`. Changing a document's `version` makes every user re-accept at next sign-in:
   change it only when the meaning changes, never for typo fixes. Don't re-enable the built-in `TERMS_AND_CONDITIONS`.
 - Event listeners and required actions must not access the realm/user model after the transaction commits.
-- Theme work: see [frontend.md](frontend.md#keycloak-theme-appskeycloak-theme) and the `change-keycloak-page` skill.
+- Theme work: see [frontend.md](frontend.md#keycloak-theme-keycloakify) and the `change-keycloak-page` skill.

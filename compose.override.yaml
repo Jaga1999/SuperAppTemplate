@@ -17,7 +17,11 @@ services:
 
   postgres:
     ports:
-      - "127.0.0.1:5432:5432"
+      - "127.0.0.1:5432:5432"   # app database
+
+  keycloak-postgres:
+    ports:
+      - "127.0.0.1:5433:5432"   # Keycloak database
 
   redis:
     ports:
@@ -25,7 +29,11 @@ services:
 
   kafka:
     ports:
-      - "127.0.0.1:9094:9094"
+      - "127.0.0.1:9094:9094"   # app cluster
+
+  keycloak-kafka:
+    ports:
+      - "127.0.0.1:9095:9095"   # Keycloak event cluster
 
   mailpit:
     ports:

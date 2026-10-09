@@ -7,3 +7,5 @@
 .env
 .idea
 **/*.log
+**/playwright-report
+**/test-results

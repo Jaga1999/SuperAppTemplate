@@ -8,13 +8,17 @@ private Keycloak. This page explains how a request travels, where each responsib
 | Container | Network | Role | Public? |
 |---|---|---|---|
 | `nginx` | edge | Serves the SPA, security headers, edge rate limits, proxies `/api`, `/oauth2`, `/login/oauth2`, `/auth` to the BFF | **yes (:8080)** |
-| `backend` | edge + internal | The BFF: OAuth client, API, Keycloak proxy, event producer/consumer | no |
-| `keycloak` | internal | Identity provider (realm `superapp`), runs on Temurin 25 | no |
-| `postgres` | internal | Two databases with separate users: `superapp` and `keycloak` | no |
-| `redis` | internal | Revocation markers, refresh single-flight, rate-limit buckets | no |
-| `kafka` | internal | KRaft broker; topics declared by the BFF at startup | no |
-| `mailpit` | internal | Dev SMTP sink (replace with a real SMTP relay in production) | no |
+| `backend` | edge + app-net + identity-net | The BFF: OAuth client, API, Keycloak proxy, event producer/consumer | no |
+| `postgres` | app-net | App database (`superapp`), schema owned by Flyway | no |
+| `redis` | app-net | Revocation markers, refresh single-flight, rate-limit buckets | no |
+| `kafka` | app-net | App KRaft broker; topics declared by the BFF at startup (auto-create off) | no |
+| `keycloak` | identity-net + keycloak-db | Identity provider (realm `superapp`), runs on Temurin 25 | no |
+| `keycloak-postgres` | keycloak-db | Keycloak's own database; only Keycloak can reach it | no |
+| `keycloak-kafka` | identity-net | Keycloak's own KRaft broker, carries `keycloak.events` only | no |
+| `mailpit` | identity-net | Dev SMTP sink for Keycloak (replace with a real SMTP relay in production) | no |
 
+The app and Keycloak share no data store: each has its own Postgres and Kafka, so a migration, outage or load spike on
+one side can't touch the other. Keycloak has no Redis (it caches in its embedded Infinispan).
 Every container gets only the environment variables it needs (see `compose.yaml`). Keycloak cannot be reached from the
 internet at all; the browser reaches its login pages only through the BFF's allow-listed proxy.
 
@@ -99,8 +103,6 @@ com.superapp
 ├── auth        BFF security: chains, cookies, OAuth client, token refresh, revocation, rate limits, Keycloak proxy
 ├── identity    Keycloak Admin API client (@HttpExchange), Keycloak events consumer, account endpoints
 ├── user        local user projection (app_user), /me
-├── todo        the example feature: API, service, events, quota, premium rules
-├── activity    activity feed built from todo events (Kafka consumer)
 └── admin       admin overview and user management (role admin)
 ```
 
@@ -114,14 +116,17 @@ Rules (enforced by `ArchitectureTest` with ArchUnit, not by Spring Modulith):
 ### Events
 
 ```
-TodoService (tx) ──► Outbox.publish(...)  ──same transaction──►  outbox_event (jsonb)
-OutboxRelay (@Scheduled, FOR UPDATE SKIP LOCKED) ──► Kafka superapp.todo.events ──► TodoEventsConsumer ──► activity_entry
-Keycloak ──► SPI superapp-kafka (after commit) ──► Kafka keycloak.events ──► KeycloakEventsListener ──► revocation + IdentityEvent
+YourService (tx) ──► Outbox.publish(topic, key, event) ──same transaction──► outbox_event (jsonb)
+OutboxRelay (@Scheduled, FOR UPDATE SKIP LOCKED) ──► app kafka <your topic> ──► your @KafkaListener
+Keycloak ──► SPI superapp-kafka (after commit) ──► keycloak-kafka keycloak.events ──► KeycloakEventsListener ──► revocation + IdentityEvent
 ```
 
-- Delivery is at least once; consumers de-duplicate on `eventId` (activity) or are idempotent (revocation).
-- Failed records retry 4 times with back-off, then go to `<topic>.DLT`. Unparseable JSON goes to the DLT at once.
-- Consumers read their own contract records (`TodoEventMessage`, `IdentityEventMessage`), never the producer's classes.
+- App topics live on the app cluster and are declared in `shared/config/KafkaTopicsConfig`. The Keycloak listener
+  reads from Keycloak's cluster through its own container factory (`identity/internal/KeycloakEventsKafkaConfig`).
+- Delivery is at least once; consumers de-duplicate on an event id or are idempotent (revocation).
+- Failed records retry 4 times with back-off, then go to `<topic>.DLT` on the app cluster (the BFF never writes to
+  Keycloak's cluster). Unparseable JSON goes to the DLT at once.
+- Consumers read their own contract records (e.g. `IdentityEventMessage`), never the producer's classes.
 
 ### JSON (Jackson 3)
 
@@ -131,14 +136,12 @@ fields are nullable wrappers; required inbound fields use `@JsonProperty(require
 
 ## 5. Frontend
 
-`frontend/` is a pnpm workspace:
+Two independent React projects (npm, each with its own lockfile and its own copy of the shadcn UI kit):
 
-| Package | Ships in | Notes |
+| Folder | Ships in | Notes |
 |---|---|---|
-| `@superapp/ui` | both apps | Tailwind 4 tokens (`globals.css`), shadcn components, brand assets. Source-only package. |
-| `@superapp/web` | nginx image | React Router 8 SPA, TanStack Query; talks only to `/api` on its own origin |
-| `@superapp/keycloak-theme` | Keycloak image | Keycloakify 11; every login page re-implemented with `@superapp/ui` |
-| `@superapp/e2e` | — | Playwright against the running stack |
+| `frontend/` | nginx image | React Router 8 SPA, TanStack Query; talks only to `/api` on its own origin. `frontend/e2e`: Playwright against the running stack |
+| `keycloakify/` | Keycloak image | Keycloakify 11; every login page re-implemented with the same design tokens |
 
 The SPA never calls Keycloak. Every auth interaction (sign in, sign up, add passkey, change password, delete account)
 is a full-page navigation to `/oauth2/authorization/keycloak?action=…`, which runs a Keycloak application-initiated

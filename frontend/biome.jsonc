@@ -1,0 +1,53 @@
+{
+	"$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+	"vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
+	"files": {
+		"includes": [
+			"**",
+			"!dist",
+			"!node_modules",
+			"!public",
+			"!e2e/playwright-report",
+			"!e2e/test-results"
+		]
+	},
+	// Biome is the linter only: formatting and import sorting stay as written.
+	"formatter": { "enabled": false },
+	"assist": { "enabled": false },
+	"css": { "parser": { "tailwindDirectives": true } },
+	"linter": {
+		"enabled": true,
+		"domains": { "react": "recommended" },
+		"rules": {
+			"preset": "recommended",
+			// Index keys are only used for fixed-length lists that never reorder (skeletons, OTP slots, Keycloak-provided lists).
+			"suspicious": { "noArrayIndexKey": "off" },
+			// `role` is also a prop of our own components (e.g. <RequireRole role="admin">).
+			"a11y": {
+				"useValidAriaRole": {
+					"level": "error",
+					"options": { "ignoreNonDom": true }
+				}
+			}
+		}
+	},
+	"overrides": [
+		{
+			// Vendored shadcn/ui components: kept as generated so `npx shadcn add` updates apply cleanly.
+			"includes": ["src/components/ui/**"],
+			"linter": {
+				"rules": {
+					"style": { "useImportType": "off" },
+					"suspicious": { "noDocumentCookie": "off", "noDoubleEquals": "off" },
+					"correctness": { "useExhaustiveDependencies": "off" },
+					"a11y": { "useSemanticElements": "off", "noSvgWithoutTitle": "off" }
+				}
+			}
+		},
+		{
+			// Tailwind's reduced-motion reset must win over component animations.
+			"includes": ["src/styles/globals.css"],
+			"linter": { "rules": { "complexity": { "noImportantStyles": "off" } } }
+		}
+	]
+}

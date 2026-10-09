@@ -19,8 +19,6 @@ import org.springframework.scheduling.annotation.EnableScheduling;
  *   <li>{@code auth}     – BFF security: Keycloak login, cookie tokens, refresh, revocation, rate limits, /auth proxy</li>
  *   <li>{@code identity} – Keycloak Admin API + Keycloak event stream (Kafka)</li>
  *   <li>{@code user}     – local projection of Keycloak users</li>
- *   <li>{@code todo}     – the example domain</li>
- *   <li>{@code activity} – activity feed built from todo events consumed from Kafka</li>
  *   <li>{@code admin}    – admin-only endpoints</li>
  * </ul>
  * The boundaries are enforced by {@code ArchitectureTest}.

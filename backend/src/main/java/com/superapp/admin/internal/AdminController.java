@@ -22,7 +22,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.superapp.auth.SessionRevocation;
 import com.superapp.identity.IdentityDirectory;
-import com.superapp.todo.TodoMetrics;
 import com.superapp.user.UserDirectory;
 
 @RestController
@@ -31,40 +30,34 @@ import com.superapp.user.UserDirectory;
 class AdminController {
 
     private final UserDirectory users;
-    private final TodoMetrics todos;
     private final IdentityDirectory identity;
     private final SessionRevocation revocation;
 
-    AdminController(UserDirectory users, TodoMetrics todos, IdentityDirectory identity, SessionRevocation revocation) {
+    AdminController(UserDirectory users, IdentityDirectory identity, SessionRevocation revocation) {
         this.users = users;
-        this.todos = todos;
         this.identity = identity;
         this.revocation = revocation;
     }
 
-    record Overview(long activeUsers, long keycloakUsers, long signupsLast7Days, long todos, long completedTodos,
-            long overdueTodos) {
+    record Overview(long activeUsers, long keycloakUsers, long signupsLast7Days) {
     }
 
     record AdminUserView(UUID id, @Nullable String email, @Nullable String displayName, String status,
-            Instant createdAt, @Nullable Instant lastLoginAt, long todos) {
+            Instant createdAt, @Nullable Instant lastLoginAt) {
     }
 
     @GetMapping("/overview")
     Overview overview() {
-        var totals = todos.totals();
         return new Overview(users.countActive(), identity.countUsers(),
-                users.countSignedUpSince(Instant.now().minus(Duration.ofDays(7))),
-                totals.todos(), totals.completed(), totals.overdue());
+                users.countSignedUpSince(Instant.now().minus(Duration.ofDays(7))));
     }
 
     @GetMapping("/users")
     Page<AdminUserView> users(@RequestParam(defaultValue = "0") @Min(0) int page,
             @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
         var result = users.list(PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt")));
-        var counts = todos.countsByOwner(result.map(UserDirectory.UserSummary::id).getContent());
         return result.map(u -> new AdminUserView(u.id(), u.email(), u.displayName(), u.status(), u.createdAt(),
-                u.lastLoginAt(), counts.getOrDefault(u.id(), 0L)));
+                u.lastLoginAt()));
     }
 
     /** Force sign-out of a user on every device, effective immediately. */

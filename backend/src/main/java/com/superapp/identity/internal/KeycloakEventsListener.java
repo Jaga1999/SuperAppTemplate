@@ -26,9 +26,9 @@ import tools.jackson.databind.json.JsonMapper;
  * Consumes Keycloak's user + admin events from Kafka and turns them into:
  * <ul>
  *   <li><b>instant revocation</b> (logout, session killed, user disabled/deleted, "sign out" by admin), and</li>
- *   <li>in-process {@link IdentityEvent}s for features that keep local data (user projection, todo cleanup).</li>
+ *   <li>in-process {@link IdentityEvent}s for features that keep local data (e.g. the user projection).</li>
  * </ul>
- * Handlers are idempotent; redelivery is harmless.
+ * Handlers are idempotent; redelivery is harmless. Reads from Keycloak's Kafka cluster, see {@link KeycloakEventsKafkaConfig}.
  */
 @Component
 class KeycloakEventsListener {
@@ -48,7 +48,8 @@ class KeycloakEventsListener {
         this.realm = properties.keycloak().realm();
     }
 
-    @KafkaListener(id = "identity-events", topics = "${superapp.kafka.topics.keycloak-events}", groupId = "superapp-identity")
+    @KafkaListener(id = "identity-events", topics = "${superapp.kafka.topics.keycloak-events}", groupId = "superapp-identity",
+            containerFactory = KeycloakEventsKafkaConfig.CONTAINER_FACTORY)
     @Transactional
     void on(String payload) {
         var message = json.readValue(payload, IdentityEventMessage.class);

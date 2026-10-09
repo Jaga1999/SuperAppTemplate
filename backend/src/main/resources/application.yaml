@@ -127,12 +127,12 @@ superapp:
       login-pages-per-minute: 60
   identity:
     google-login-enabled: ${SUPERAPP_GOOGLE_LOGIN_ENABLED:false}
+    events:
+      # Keycloak's own Kafka cluster (separate from spring.kafka.*, which is the app's cluster).
+      bootstrap-servers: ${KEYCLOAK_KAFKA_BOOTSTRAP_SERVERS:localhost:9095}
   kafka:
     topics:
       keycloak-events: keycloak.events
-      todo-events: superapp.todo.events
-  todo:
-    free-open-limit: 25
   outbox:
     poll-interval: PT0.5S
 

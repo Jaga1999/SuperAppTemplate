@@ -1,27 +1,27 @@
-# Frontend rules (pnpm workspace in `frontend/`)
+# Frontend rules (two independent React projects, npm only)
 
-## Packages
+## Projects
 
-| Package | Purpose | May import |
+| Folder | Purpose | Notes |
 |---|---|---|
-| `packages/ui` (`@superapp/ui`) | Design tokens, shadcn components, brand | its own files only |
-| `apps/web` | Product SPA | `@superapp/ui` |
-| `apps/keycloak-theme` | Keycloakify login theme | `@superapp/ui`, `keycloakify` |
-| `apps/e2e` | Playwright tests | `@playwright/test` |
+| `frontend/` | Product SPA, served by nginx | Playwright e2e suite in `frontend/e2e` |
+| `keycloakify/` | Keycloakify login theme, baked into the Keycloak image | Never imports from `frontend/` |
 
-`apps/web` and `apps/keycloak-theme` never import each other. Shared UI goes to `packages/ui`.
+The two projects share no code and have their own `package.json`, `package-lock.json` and copy of the UI kit
+(`src/components/ui`, `src/lib/utils.ts`, `src/styles/globals.css`). When you change a design token or a shared
+component, apply it to both copies so the app and the sign-in pages keep looking the same.
 
 ## Stack and style
 
-- React 19, TypeScript 7 (strict), Vite 8, Tailwind 4 (tokens in `packages/ui/src/styles/globals.css`), shadcn
-  (`radix-nova` style), TanStack Query 5, React Router 8, oxlint.
-- Imports: `@superapp/ui/components/<name>`, `@superapp/ui/lib/utils`, `@superapp/ui/hooks/<name>`.
-- New shadcn components: `cd frontend/packages/ui && pnpm dlx shadcn@latest add <name>`.
+- npm only (never pnpm or yarn). React 19, TypeScript 7 (strict), Vite 8, Tailwind 4 (tokens in
+  `src/styles/globals.css`), shadcn (`radix-nova` style), TanStack Query 5, React Router 8. Lint with Biome (`npm run lint`, config in `biome.jsonc`; linter only, no formatter).
+- Imports: `@/components/ui/<name>`, `@/lib/utils`, `@/hooks/<name>` (`@` = the project's `src/`).
+- New shadcn components: `cd frontend && npx shadcn@latest add <name>` (or in `keycloakify/`).
 - Colors only through tokens (`bg-primary`, `text-muted-foreground`, ...). Every screen works in light and dark mode
   and at phone width.
 - Accessible by default: labelled inputs, `aria-label` on icon buttons, keyboard reachable, visible focus.
 
-## Talking to the server (apps/web)
+## Talking to the server (frontend/)
 
 - Only `src/lib/api.ts` performs requests: same origin, cookies, XSRF header, `ApiError` from problem details.
 - Server state lives in TanStack Query (`src/lib/queries.ts`, keys in `keys`). No duplicated server state in React state.
@@ -29,7 +29,7 @@
   `auth.withGoogle()`, `auth.runAction('<action>')`, `auth.signOut()`.
 - Role checks in the UI (`RequireRole`) only hide dead ends; the BFF enforces authorization.
 
-## Keycloak theme (apps/keycloak-theme)
+## Keycloak theme (keycloakify/)
 
 - Every Keycloak page has a component (mapped in `src/login/KcPage.tsx`). Keep Keycloak's form field names and ids
   (`username`, `password`, `password-new`, `kc-login`, ...): Keycloak and its scripts depend on them.

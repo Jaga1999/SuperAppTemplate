@@ -3,12 +3,16 @@ package com.superapp;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.context.annotation.Bean;
+import org.springframework.test.context.DynamicPropertyRegistrar;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.kafka.KafkaContainer;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
-/** Same image versions as compose.yaml: tests run against what production runs. */
+/**
+ * Same image versions as compose.yaml: tests run against what production runs. One Kafka container plays both the
+ * app's cluster and Keycloak's cluster.
+ */
 @TestConfiguration(proxyBeanMethods = false)
 public class TestcontainersConfiguration {
 
@@ -16,6 +20,11 @@ public class TestcontainersConfiguration {
     @ServiceConnection
     KafkaContainer kafkaContainer() {
         return new KafkaContainer(DockerImageName.parse("apache/kafka:4.3.1"));
+    }
+
+    @Bean
+    DynamicPropertyRegistrar keycloakKafka(KafkaContainer kafka) {
+        return registry -> registry.add("superapp.identity.events.bootstrap-servers", kafka::getBootstrapServers);
     }
 
     @Bean

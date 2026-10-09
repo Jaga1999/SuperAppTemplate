@@ -11,7 +11,7 @@ import org.springframework.kafka.config.TopicBuilder;
 import org.springframework.kafka.core.KafkaAdmin;
 
 /**
- * Declares every topic the app uses, plus its dead-letter topic. Spring's {@link KafkaAdmin} creates missing topics
+ * Declares every topic on the app's Kafka cluster, plus dead-letter topics. Spring's {@link KafkaAdmin} creates missing topics
  * at startup and leaves existing ones alone, so no separate init container is needed. The broker has
  * {@code auto.create.topics.enable=false}: a typo in a topic name fails loudly instead of creating a stray topic.
  *
@@ -25,11 +25,10 @@ class KafkaTopicsConfig {
     @Bean
     KafkaAdmin.NewTopics superappTopics(
             @Value("${superapp.kafka.topics.keycloak-events}") String keycloakEvents,
-            @Value("${superapp.kafka.topics.todo-events}") String todoEvents,
             @Value("${superapp.kafka.replicas:1}") int replicas) {
-        return new KafkaAdmin.NewTopics(
-                topic(keycloakEvents, 3, replicas), dlt(keycloakEvents, replicas),
-                topic(todoEvents, 3, replicas), dlt(todoEvents, replicas));
+        // keycloak.events itself lives on Keycloak's cluster (created by compose); only its dead letters land here.
+        // Add your own topics as: topic(name, partitions, replicas), dlt(name, replicas)
+        return new KafkaAdmin.NewTopics(dlt(keycloakEvents, replicas));
     }
 
     private static NewTopic topic(String name, int partitions, int replicas) {

@@ -10,7 +10,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class LoginOptionsTest {
 
     @ParameterizedTest
-    @ValueSource(strings = {"/app", "/app/settings/security", "/app/todos?filter=open", "/"})
+    @ValueSource(strings = {"/app", "/app/settings/security", "/app/settings/sessions?from=email", "/"})
     void acceptsSameOriginPaths(String path) {
         assertThat(LoginOptions.safeReturnPath(path)).contains(path);
     }

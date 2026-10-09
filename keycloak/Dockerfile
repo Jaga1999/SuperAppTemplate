@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7
 # SuperApp Keycloak image. Build context: repository root.
 #
-#  1. theme  – builds the Keycloakify login theme JAR (frontend/apps/keycloak-theme + the shared @superapp/ui design system)
+#  1. theme  – builds the Keycloakify login theme JAR (keycloakify/, a standalone React project)
 #  2. spi    – builds our Keycloak extensions (Java 25): Kafka event listener, legal-consent required action
 #  3. build  – Keycloak 26.8.0 distribution on Temurin 25, providers added, `kc.sh build` (optimized image)
 #  4. final  – minimal Temurin 25 JRE runtime, non-root
@@ -14,19 +14,13 @@ COPY --from=node:24.21.0-trixie-slim /usr/local/bin/node /usr/local/bin/node
 COPY --from=node:24.21.0-trixie-slim /usr/local/lib/node_modules /usr/local/lib/node_modules
 RUN ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
  && ln -s /usr/local/lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx \
- && ln -s /usr/local/lib/node_modules/corepack/dist/corepack.js /usr/local/bin/corepack \
- && corepack enable --install-directory /usr/local/bin \
- && node --version && npx --version && mvn --version
+ && node --version && npm --version && mvn --version
 WORKDIR /src
-# Only the theme app and the design system: product (web app) changes never rebuild Keycloak.
-COPY frontend/package.json frontend/pnpm-lock.yaml frontend/pnpm-workspace.yaml frontend/tsconfig.base.json ./
-COPY frontend/packages/ui/package.json packages/ui/
-COPY frontend/apps/web/package.json apps/web/
-COPY frontend/apps/keycloak-theme/package.json apps/keycloak-theme/
-RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store     pnpm install --frozen-lockfile --filter "@superapp/keycloak-theme..."
-COPY frontend/packages/ui/ packages/ui/
-COPY frontend/apps/keycloak-theme/ apps/keycloak-theme/
-RUN --mount=type=cache,id=m2,target=/root/.m2 pnpm --filter @superapp/keycloak-theme build-keycloak-theme
+# Only the theme project: product (frontend/) changes never rebuild Keycloak.
+COPY keycloakify/package.json keycloakify/package-lock.json ./
+RUN --mount=type=cache,id=npm,target=/root/.npm npm ci --no-audit --no-fund
+COPY keycloakify/ ./
+RUN --mount=type=cache,id=m2,target=/root/.m2 npm run build-keycloak-theme
 
 # ── 2. Kafka event listener SPI ──────────────────────────────────────────────
 FROM eclipse-temurin:25-jdk-noble AS spi
@@ -39,7 +33,7 @@ FROM quay.io/keycloak/keycloak:${KEYCLOAK_VERSION} AS distribution
 
 FROM eclipse-temurin:25-jdk-ubi10-minimal AS build
 COPY --from=distribution /opt/keycloak /opt/keycloak
-COPY --from=theme /src/apps/keycloak-theme/dist_keycloak/superapp-keycloak-theme.jar /opt/keycloak/providers/
+COPY --from=theme /src/dist_keycloak/superapp-keycloak-theme.jar /opt/keycloak/providers/
 COPY --from=spi   /src/build/providers/ /opt/keycloak/providers/
 COPY keycloak/themes/ /opt/keycloak/themes/
 # Legal documents: the legal-consent required action reads their versions at startup (single source: legal/*.md)

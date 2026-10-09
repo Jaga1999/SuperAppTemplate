@@ -2,7 +2,7 @@
 
 ## Structure
 
-- Feature packages under `com.superapp`: `auth`, `identity`, `user`, `todo`, `activity`, `admin`, plus `shared`.
+- Feature packages under `com.superapp`: `auth`, `identity`, `user`, `admin`, plus `shared`.
 - A feature's root package is its public API (facades, events, DTOs). Implementation lives in `<feature>.internal`.
 - Never import another feature's `internal` package. `shared` imports no feature. No cycles. `ArchitectureTest` enforces
   this; don't weaken it.

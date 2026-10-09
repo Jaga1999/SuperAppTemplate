@@ -49,5 +49,5 @@ a single host, or translate it to your orchestrator. Go through every item befor
 - [ ] Metrics: Prometheus scrapes `:9090/actuator/prometheus` (BFF) and `:9000/auth/metrics` (Keycloak).
 - [ ] Logs: the `docker` profile emits ECS JSON with request ids; ship them to your log store.
 - [ ] Rate limits reviewed for real traffic (`infra/nginx/nginx.conf`, `superapp.bff.rate-limit.*`).
-- [ ] Run the e2e suite against staging: `E2E_BASE_URL=https://staging.example.com pnpm --dir frontend/apps/e2e test`
+- [ ] Run the e2e suite against staging: `E2E_BASE_URL=https://staging.example.com npm --prefix frontend run e2e`
       (needs a reachable mail API, or adapt `linkFromEmail`).

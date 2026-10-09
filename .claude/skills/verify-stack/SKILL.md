@@ -15,12 +15,18 @@ Run in order; stop and fix at the first failure. Report each step's real result.
    ```bash
    cd keycloak/extensions/superapp-extensions && ./gradlew build
    ```
-2. Frontend:
+2. Frontend (both React projects):
    ```bash
-   pnpm --dir frontend typecheck
+   npm --prefix frontend run typecheck
    ```
    ```bash
-   pnpm --dir frontend lint
+   npm --prefix frontend run lint
+   ```
+   ```bash
+   npm --prefix keycloakify run typecheck
+   ```
+   ```bash
+   npm --prefix keycloakify run lint
    ```
 3. Images and health (every service must be `healthy`):
    ```bash
@@ -31,7 +37,7 @@ Run in order; stop and fix at the first failure. Report each step's real result.
    ```
 4. End to end (registration, legal consent once, all APIs, wrong password, forgot password, passkeys):
    ```bash
-   pnpm --dir frontend/apps/e2e test
+   npm --prefix frontend run e2e
    ```
 5. Log scan after the e2e run. Each count should be 0:
    ```bash
