@@ -3,10 +3,10 @@ import { kcEnvDefaults, themeNames } from '../kc.gen'
 import type { KcContext, KcContextExtension, KcContextExtensionPerPage } from './KcContext'
 
 /**
- * Dev-only: render any Keycloak page inside `pnpm dev` without a Keycloak server.
- *   http://localhost:5173/?kc=login.ftl
- *   http://localhost:5173/?kc=register.ftl
- *   http://localhost:5173/?kc=login-config-totp.ftl
+ * Dev-only: render any Keycloak page inside `npm run dev` without a Keycloak server.
+ *   http://localhost:5174/?kc=login.ftl
+ *   http://localhost:5174/?kc=register.ftl
+ *   http://localhost:5174/?kc=login-config-totp.ftl
  * Imported dynamically from main.tsx only when import.meta.env.DEV, so it never ships to production.
  */
 const kcContextExtension: KcContextExtension = {

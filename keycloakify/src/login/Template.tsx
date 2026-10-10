@@ -18,17 +18,6 @@ export type SuperAppTemplateProps = TemplateProps<KcContext, I18n> & {
   subtitleNode?: ReactNode
 }
 
-/** Follows the OS color scheme (the SPA uses the same tokens; the theme has no toggle of its own). */
-function useSystemColorScheme() {
-  useEffect(() => {
-    const media = window.matchMedia('(prefers-color-scheme: dark)')
-    const apply = () => document.documentElement.classList.toggle('dark', media.matches)
-    apply()
-    media.addEventListener('change', apply)
-    return () => media.removeEventListener('change', apply)
-  }, [])
-}
-
 /**
  * Shell of every Keycloak page: brand panel (desktop) + focused form column.
  * Renders Keycloak's global message, the "attempted username" chip, "try another way", social providers and
@@ -53,7 +42,6 @@ export default function Template(props: SuperAppTemplateProps) {
   const { msg, msgStr, enabledLanguages } = i18n
   const { realm, auth, url, message, isAppInitiatedAction, client } = kcContext
 
-  useSystemColorScheme()
 
   useEffect(() => {
     document.title = documentTitle ?? `${typeof headerNode === 'string' ? `${headerNode} · ` : ''}${realm.displayName || 'SuperApp'}`
@@ -117,7 +105,7 @@ export default function Template(props: SuperAppTemplateProps) {
         </header>
 
         <div className="flex flex-1 items-center justify-center px-5 py-10 sm:px-8">
-          <div className="animate-in fade-in slide-in-from-bottom-2 w-full max-w-[400px] duration-500">
+          <div className="animate-in fade-in slide-in-from-bottom-2 w-full max-w-[25rem] duration-500">
             <div className="mb-7 space-y-2">
               {showAttemptedUsername ? (
                 <div className="space-y-3">

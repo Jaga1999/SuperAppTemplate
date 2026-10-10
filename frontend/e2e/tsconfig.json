@@ -16,6 +16,8 @@
   },
   "include": [
     "tests",
-    "playwright.config.ts"
+    "screenshots",
+    "playwright.config.ts",
+    "playwright.screenshots.config.ts"
   ]
 }

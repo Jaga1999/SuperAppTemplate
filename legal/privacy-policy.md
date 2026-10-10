@@ -21,7 +21,7 @@ Privacy contact: **[privacy@example.com]**. **[Data protection officer, if requi
 |---|---|---|
 | Email address, first and last name | You, at sign-up or from Google if you choose *Continue with Google* | To create and run your account (contract) |
 | Sign-in credentials: password hash, passkey public keys, authenticator secrets, recovery codes | You | To keep your account secure (contract, legitimate interest) |
-| To-dos, notes, due dates, priorities | You | To provide the service (contract) |
+| Content you create in the app | You | To provide the service (contract) |
 | Session and security data: IP address, device/browser, sign-in times, security events | Automatically | Security, fraud prevention, "where you're signed in" (legitimate interest) |
 | Acceptance of these documents (version and time) | Automatically | To prove consent and acceptance (legal obligation, legitimate interest) |
 
@@ -49,12 +49,11 @@ We share data with authorities only when the law requires it.
 
 | Data | Retention |
 |---|---|
-| Account data, to-dos | Until you delete your account |
+| Account data and your content | Until you delete your account |
 | Security events and logs | **[e.g. 90 days]** |
-| Activity feed | Until you delete your account |
 | Record of document acceptance | For as long as your account exists, plus **[period]** where the law requires |
 
-When you delete your account, your account data and to-dos are deleted. Backups are overwritten on their normal
+When you delete your account, your account data and content are deleted. Backups are overwritten on their normal
 cycle (**[e.g. 30 days]**).
 
 ## 7. Your rights

@@ -33,11 +33,11 @@ const { useI18n, ofTypeI18n } = i18nBuilder
       orUseEmail: 'or use your email',
       alreadyHaveAccount: 'Already have an account?',
       backToApp: 'Back to SuperApp',
-      brandHeadline: 'Plan less. Ship more.',
-      brandSubline: 'A calm, fast place for everything on your plate, protected like a bank vault.',
+      brandHeadline: 'Secure from the first sign-in.',
+      brandSubline: 'Passwordless sign-in, two-step verification and full control over every device you use.',
       brandPoint1: 'Passkeys & two-step verification',
       brandPoint2: 'Sign out of every device instantly',
-      brandPoint3: 'Your data stays yours: export or delete anytime',
+      brandPoint3: 'Your account, your data: delete it anytime',
       securedBy: 'Secured sign-in',
       otpCodeLabel: 'Authentication code',
       otpCodeHelp: 'Open your authenticator app and enter the 6-digit code.',
@@ -45,7 +45,7 @@ const { useI18n, ofTypeI18n } = i18nBuilder
       termsTitle: 'Terms of Service',
       termsText:
         '<p>SuperApp is a template app. By continuing you agree to use it lawfully and to keep your sign-in methods to yourself.</p>' +
-        '<p>We store only what the app needs to work: your name, email and to-dos. You can export or delete your account at any time from Settings.</p>' +
+        '<p>We store only what the app needs to work: your name and email. You can delete your account at any time from Settings.</p>' +
         '<p>Replace this text with your real Terms of Service and Privacy Policy before going live.</p>',
       updatePasswordMessage: 'Set a password to continue.',
       legalConsentTitle: 'Review and accept',

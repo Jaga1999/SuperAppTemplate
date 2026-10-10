@@ -40,7 +40,7 @@ We may suspend or close accounts that break these rules.
 
 ## 5. Your content
 
-The to-dos and other content you create remain yours. You give us the limited permission needed to store, process
+The content you create remains yours. You give us the limited permission needed to store, process
 and display them to provide the service to you. We don't sell your content.
 
 ## 6. Plans and payments

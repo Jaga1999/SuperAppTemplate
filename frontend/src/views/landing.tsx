@@ -8,6 +8,7 @@ import {
   LockKeyholeIcon,
   LogOutIcon,
   MailCheckIcon,
+  MenuIcon,
   MoonStarIcon,
   ServerIcon,
   ShieldCheckIcon,
@@ -22,6 +23,7 @@ import { Badge } from '@/components/ui/badge'
 import { GoogleIcon } from '@/components/ui/brand/google-icon'
 import { Logo } from '@/components/ui/brand/logo'
 import { Button } from '@/components/ui/button'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { auth } from '@/lib/auth'
 import { CURRENT_YEAR } from '@/lib/format'
 import { useMe, usePublicConfig } from '@/lib/queries'
@@ -40,7 +42,7 @@ export function LandingPage() {
 
       {/* ── Nav ─────────────────────────────────────────────────────── */}
       <header className="bg-background/70 sticky top-0 z-30 border-b border-transparent backdrop-blur-xl supports-[backdrop-filter]:border-border/60">
-        <nav className="mx-auto flex h-16 max-w-6xl items-center gap-6 px-5">
+        <nav className="mx-auto flex h-16 max-w-6xl 2xl:max-w-[88rem] items-center gap-6 px-5">
           <Link href="/" aria-label="SuperApp home">
             <Logo />
           </Link>
@@ -49,6 +51,21 @@ export function LandingPage() {
             <a href="#security" className="hover:text-foreground transition-colors">Security</a>
           </div>
           <div className="ml-auto flex items-center gap-1.5">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="md:hidden" aria-label="Open menu">
+                  <MenuIcon />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-44">
+                <DropdownMenuItem asChild>
+                  <a href="#features">Features</a>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <a href="#security">Security</a>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <ThemeToggle />
             {signedIn ? (
               <Button asChild size="lg">
@@ -70,13 +87,13 @@ export function LandingPage() {
       <section className="relative">
         <div className="bg-grid pointer-events-none absolute inset-0 [mask-image:radial-gradient(ellipse_70%_60%_at_50%_0%,black,transparent)]" />
         <div className="bg-primary/25 pointer-events-none absolute top-[-10rem] left-1/2 h-[28rem] w-[56rem] -translate-x-1/2 rounded-full blur-[120px]" />
-        <div className="relative mx-auto grid max-w-6xl items-center gap-14 px-5 pt-20 pb-24 lg:grid-cols-[1.05fr_1fr] lg:pt-28">
+        <div className="relative mx-auto grid max-w-6xl 2xl:max-w-[88rem] items-center gap-14 px-5 pt-12 pb-16 sm:pt-20 sm:pb-24 lg:grid-cols-[1.05fr_1fr] lg:pt-28">
           <div className="animate-in fade-in slide-in-from-bottom-3 space-y-7 duration-700">
             <Badge variant="outline" className="bg-background/60 gap-1.5 rounded-full px-3 py-1 backdrop-blur">
               <SparklesIcon className="text-primary size-3.5" />
               Passkeys, MFA and instant sign-out built in
             </Badge>
-            <h1 className="text-5xl leading-[1.04] font-semibold tracking-tight text-balance sm:text-6xl">
+            <h1 className="text-4xl leading-[1.05] font-semibold tracking-tight text-balance sm:text-5xl lg:text-6xl">
               Build your product, <span className="text-brand-gradient">not your sign-in.</span>
             </h1>
             <p className="text-muted-foreground max-w-xl text-lg leading-relaxed text-pretty">
@@ -113,7 +130,7 @@ export function LandingPage() {
 
       {/* ── Features ────────────────────────────────────────────────── */}
       <section id="features" className="border-t">
-        <div className="mx-auto max-w-6xl px-5 py-24">
+        <div className="mx-auto max-w-6xl 2xl:max-w-[88rem] px-5 py-16 sm:py-24">
           <SectionHeading eyebrow="Features" title="Everything you need. Nothing you don't." subtitle="A secure account system from day one, so you can focus on your product." />
           <div className="mt-14 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <Feature icon={<FingerprintIcon />} title="Passkeys & two-step verification">
@@ -140,7 +157,7 @@ export function LandingPage() {
 
       {/* ── Security ────────────────────────────────────────────────── */}
       <section id="security" className="bg-muted/30 border-y">
-        <div className="mx-auto grid max-w-6xl items-center gap-14 px-5 py-24 lg:grid-cols-2">
+        <div className="mx-auto grid max-w-6xl 2xl:max-w-[88rem] items-center gap-14 px-5 py-16 sm:py-24 lg:grid-cols-2">
           <div className="space-y-6">
             <SectionHeading align="left" eyebrow="Security" title="Your session never touches the browser." subtitle="SuperApp uses a backend-for-frontend: sign-in happens on our own domain, tokens stay on the server, and your browser only holds an encrypted, HttpOnly cookie." />
             <ul className="space-y-3 text-sm">
@@ -164,7 +181,7 @@ export function LandingPage() {
 
       {/* ── CTA ─────────────────────────────────────────────────────── */}
       <section className="px-5 pb-24">
-        <div className="bg-brand-gradient relative mx-auto max-w-6xl overflow-hidden rounded-3xl px-8 py-16 text-center text-white">
+        <div className="bg-brand-gradient relative mx-auto max-w-6xl 2xl:max-w-[88rem] overflow-hidden rounded-3xl px-6 py-12 text-center text-white sm:px-8 sm:py-16">
           <div className="bg-grid pointer-events-none absolute inset-0 opacity-10" />
           <h2 className="relative text-3xl font-semibold tracking-tight text-balance sm:text-4xl">Start in 30 seconds.</h2>
           <p className="relative mx-auto mt-3 max-w-lg text-white/75">Create an account with your email, Google, or a passkey.</p>
@@ -175,7 +192,7 @@ export function LandingPage() {
       </section>
 
       <footer className="border-t">
-        <div className="text-muted-foreground mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-5 py-8 text-sm sm:flex-row">
+        <div className="text-muted-foreground mx-auto flex max-w-6xl 2xl:max-w-[88rem] flex-col items-center justify-between gap-4 px-5 py-8 text-sm sm:flex-row">
           <Logo className="text-foreground" />
           <p>© {CURRENT_YEAR} SuperApp. Built with Spring Boot, Keycloak and React.</p>
           <nav className="flex gap-4">

@@ -160,6 +160,14 @@
     color: transparent;
 }
 
+/* Wide screens (e.g. 1920 px at 100 % scaling): one step larger so the UI isn't small and empty. Everything is sized in
+   rem, so text, spacing and container widths grow together. Up to 1679 px nothing changes. */
+@media (min-width: 1680px) {
+    html {
+        font-size: 112.5%;
+    }
+}
+
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
         animation-duration: 0.01ms !important;

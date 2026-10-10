@@ -55,6 +55,8 @@
 }
 
 :root {
+    /* The sign-in pages are always light, whatever the OS theme (the dark tokens below stay for reference). */
+    color-scheme: light;
     /* SuperApp brand: cool neutrals + indigo. Shared by the SPA and the Keycloak theme. */
     --background: oklch(0.995 0.002 270);
     --foreground: oklch(0.17 0.02 275);
@@ -159,6 +161,14 @@
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
+}
+
+/* Wide screens (e.g. 1920 px at 100 % scaling): one step larger so the UI isn't small and empty. Everything is sized in
+   rem, so text, spacing and container widths grow together. Up to 1679 px nothing changes. */
+@media (min-width: 1680px) {
+    html {
+        font-size: 112.5%;
+    }
 }
 
 @media (prefers-reduced-motion: reduce) {

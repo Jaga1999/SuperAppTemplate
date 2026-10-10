@@ -98,7 +98,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <SidebarInset>
         <header className="bg-background/80 sticky top-0 z-10 flex h-14 shrink-0 items-center gap-2 rounded-t-xl border-b px-4 backdrop-blur">
           <SidebarTrigger className="-ml-1" />
-          <Separator orientation="vertical" className="mr-1 data-[orientation=vertical]:h-4" />
+          <Separator orientation="vertical" className="mr-1 h-4! self-center!" />
           <LayoutDashboardIcon className="text-muted-foreground size-4" />
           <h1 className="text-sm font-medium">{titles[pathname] ?? (pathname.startsWith('/app/admin') ? 'Admin' : 'SuperApp')}</h1>
           <div className="ml-auto flex items-center gap-1">
@@ -106,7 +106,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         </header>
         <main className="flex-1 px-4 py-6 md:px-8 md:py-8">
-          <div className="mx-auto w-full max-w-5xl">
+          <div className="mx-auto w-full max-w-5xl 2xl:max-w-6xl">
             {children}
           </div>
         </main>
