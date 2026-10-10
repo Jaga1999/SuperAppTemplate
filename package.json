@@ -2,9 +2,9 @@
   "name": "superapp-template",
   "version": "1.0.0",
   "private": true,
-  "description": "Project generator for the SuperApp template: npx github:<owner>/<repo> \"My App\" --fresh-git",
+  "description": "Project generator for the SuperApp template: npx github:Jaga1999/SuperAppTemplate \"My App\" --fresh-git",
   "type": "module",
-  "repository": "github:<owner>/<repo>",
+  "repository": "github:Jaga1999/SuperAppTemplate",
   "bin": {
     "superapp-template": "scripts/init-project.mjs"
   },

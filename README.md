@@ -23,8 +23,8 @@ Docker images, database, environment variables, UI texts and emails.
 # from a local checkout into a new folder (the template stays untouched)
 node scripts/init-project.mjs "Acme Shop" ../acme-shop --fresh-git
 
-# or straight from GitHub (set "repository" in the root package.json first)
-npx github:<owner>/<repo> "Acme Shop" --fresh-git
+# or straight from GitHub, nothing to clone
+npx github:Jaga1999/SuperAppTemplate "Acme Shop" --fresh-git
 ```
 
 Options, what gets renamed and what to do afterwards: [docs/template.md](docs/template.md).
