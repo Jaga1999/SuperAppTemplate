@@ -2,14 +2,18 @@
 # ${BACKEND_UPSTREAM}  → the Spring BFF (API, login, Keycloak's pages). nginx never talks to Keycloak directly.
 # ${FRONTEND_UPSTREAM} → the Next.js server (pages only; it never calls the BFF or Keycloak itself).
 
+# nginx must close idle upstream connections before the server does, or a request sent on a socket the server is
+# just closing fails or hangs. Node.js (Next.js) closes idle sockets after 5 s, Tomcat (BFF) after 20 s or more.
 upstream bff {
     server ${BACKEND_UPSTREAM};
     keepalive 64;
+    keepalive_timeout 15s;
 }
 
 upstream web {
     server ${FRONTEND_UPSTREAM};
     keepalive 32;
+    keepalive_timeout 4s;
 }
 
 server {
@@ -79,7 +83,7 @@ server {
     # Hashed, immutable build assets (Next.js sends Cache-Control: immutable).
     location /_next/static/ {
         limit_req zone=edge_static burst=200 nodelay;
-        access_log off;
+        access_log /dev/stdout edge if=$log_static;   # only failures (4xx, 5xx, 499 = client gave up)
         proxy_pass http://web;
     }
 

@@ -1,5 +1,7 @@
 # Using the template
 
+Step-by-step runbook with checks and verification: [project-initialization.md](project-initialization.md).
+
 SuperApp is meant to be **copied and renamed**, not forked by hand. `scripts/init-project.mjs` turns it into your own
 product in one command: every spelling of the name, the Java packages, the realm, themes, images, database and
 environment variables.
@@ -56,6 +58,7 @@ Google client and SMTP settings to it. `--from <git-url>` clones any other repos
 | `destination` | A path (contains `/` or `\`, or starts with `.`). Must not exist or be empty, and lie outside the template |
 | `--package com.example.shop` | Java base package (default `com.acmeshop`; Java keywords are rejected) |
 | `--from <git-url or path>` | Clone this template instead of using the local checkout |
+| `--env <path/.env>` | Use this template `.env` (with `SUPERAPP_*` names) for the new project: names renamed, values kept. Handy with `npx` and `--from`, which have no `.env` |
 | `--fresh-git` | Start a new repository with one initial commit (no template history) |
 | `--dry-run` | Print what would change; touch nothing |
 | `--help` | Usage |

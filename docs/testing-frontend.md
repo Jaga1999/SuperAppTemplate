@@ -69,8 +69,8 @@ sequenceDiagram
 | passkey: register one, then sign in with it | WebAuthn registration and passwordless sign-in |
 | passkey cancelled | The user sees a short, actionable message |
 
-The API test expects `googleLoginEnabled: true`, matching the template's `.env`. With Google sign-in off, change that
-expectation.
+The API test accepts Google sign-in on or off (`googleLoginEnabled` is any boolean), so the suite passes with or
+without a Google client in `.env`.
 
 ### Configuration (`e2e/playwright.config.ts`)
 

@@ -56,7 +56,7 @@ node scripts/start.mjs logs <service>  # why?
 | Build fails on a warning | `-Werror`: fix the warning |
 | e2e: *No email matching…* | Mailpit not reachable on :8025, or Keycloak can't send mail (`logs keycloak`) |
 | e2e: Chrome not found | Install Google Chrome (the suite uses the installed browser, `channel: 'chrome'`) |
-| e2e: API test expects Google enabled | Your `.env` has Google sign-in off; adjust the expectation |
+| e2e: the first step times out on a blank page (`kcPage` stays `undefined`) | A JavaScript chunk never arrived, so the app didn't start. nginx now closes idle upstream connections before Next.js and the BFF do (the usual cause); failed static requests appear in `logs nginx`. Rerun; if it repeats, check those log lines |
 | e2e: legal version mismatch | `keycloak/legal` and `frontend/legal` differ; copy the file across |
 
 ## Data

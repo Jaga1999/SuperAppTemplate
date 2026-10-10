@@ -16,6 +16,8 @@
 //   npx github:<owner>/<repo> "Acme Shop" ./somewhere/acme-shop --fresh-git
 // From any git URL or local repository (a fork, another remote):
 //   node scripts/init-project.mjs "Acme Shop" ./acme-shop --from https://github.com/<owner>/<repo>.git --fresh-git
+// With your template .env (npx and --from have none, git never holds it), renamed like every other file:
+//   npx github:<owner>/<repo> "Acme Shop" --env ../SuperApp/.env --fresh-git
 //
 // project-name     e.g. "acme-shop", "AcmeShop" or "Acme Shop" (letters, digits, spaces, - or _). Optional when a
 //                  destination is given (defaults to its folder name); required in place.
@@ -23,6 +25,8 @@
 //                  Must not exist yet (or be empty) and must be outside this template.
 // --package        Java base package (default: com.<name without separators>, e.g. com.acmeshop)
 // --from           git URL or path of the template to clone instead of this checkout (always copies, never in place)
+// --env            a template .env (SUPERAPP_* names) to use for the new project instead of the template's own .env or
+//                  one generated from .env.example; its values are kept, its names renamed
 // --fresh-git      delete the template's git history and start a new repository with one initial commit
 // --dry-run        print what would change, touch nothing
 //
@@ -62,7 +66,7 @@ function fail(message) {
 // ── Arguments ────────────────────────────────────────────────────────────────
 const args = process.argv.slice(2)
 const flags = new Set(args.filter((a) => a.startsWith('--') && !a.includes('=')))
-const VALUE_OPTIONS = ['--package', '--from']
+const VALUE_OPTIONS = ['--package', '--from', '--env']
 const optionValue = (option) => {
   const i = args.indexOf(option)
   if (i >= 0) return args[i + 1]
@@ -70,13 +74,16 @@ const optionValue = (option) => {
 }
 const packageArg = optionValue('--package')
 const fromArg = optionValue('--from')
+const envArg = optionValue('--env')
+const envSource = envArg ? path.resolve(envArg) : null
+if (envSource && !fs.statSync(envSource, { throwIfNoEntry: false })?.isFile()) fail(`--env: ${envSource} is not a file.`)
 const positional = args.filter((a, i) => !a.startsWith('--') && !VALUE_OPTIONS.includes(args[i - 1]))
 // Project names never contain path characters, so anything path-like is the destination.
 const isPath = (a) => /[\\/]/.test(a) || a.startsWith('.')
 const nameArg = positional.find((a) => !isPath(a))
 const destinationArg = positional.find(isPath)
 const usage =
-  'Usage: node scripts/init-project.mjs [project-name] [destination] [--package com.example.app] [--from <git-url>] [--fresh-git] [--dry-run]'
+  'Usage: node scripts/init-project.mjs [project-name] [destination] [--package com.example.app] [--from <git-url>] [--env <path/.env>] [--fresh-git] [--dry-run]'
 if (flags.has('--help')) {
   console.log(usage)
   process.exit(0)
@@ -194,6 +201,11 @@ if (destination && !dryRun) {
     filter: (source) => source === templateRoot || !SKIP_DIRS.has(path.basename(source)),
   })
   console.log(`✔ Copied the template to ${destination}`)
+}
+// --env replaces whatever .env the template had; the content replacement below renames it like every other file.
+if (envSource) {
+  if (!dryRun) fs.copyFileSync(envSource, path.join(root, '.env'))
+  console.log(`✔ ${dryRun ? 'Would use' : 'Using'} ${envSource} as .env (names renamed below, values kept)`)
 }
 
 // ── Content replacement ─────────────────────────────────────────────────────
@@ -313,7 +325,8 @@ if (fs.existsSync(examplePath)) {
     console.log(`✔ The template has no .env: ${dryRun ? 'would create' : 'created'} one from .env.example with generated secrets`)
     console.log('  Add optional values yourself (Google client, SMTP relay): see docs/configuration.md')
   } else {
-    console.log(`✔ ${destination ? 'Copied the template\'s .env (renamed, values kept)' : 'Kept .env (renamed, values kept)'}`)
+    const origin = envSource ? `the .env from ${envSource}` : destination ? "the template's .env" : '.env'
+    console.log(`✔ Kept ${origin} (renamed, values kept)`)
     if (added.length > 0) {
       const block = `\n\n# Added by init-project from .env.example (new in the template)\n${lines.join('\n')}\n`
       if (!dryRun) fs.writeFileSync(envPath, existing.replace(/\s*$/, '') + block)

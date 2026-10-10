@@ -59,6 +59,7 @@ npx github:<you>/SuperApp "Acme Shop" --fresh-git
 | `--package com.example.shop` | Java base package (default `com.acmeshop`) |
 | `--fresh-git` | Start a new git repository with one initial commit |
 | `--from <git-url>` | Clone the template from this URL instead of using the local copy |
+| `--env <path/.env>` | Use this template `.env` for the new project (renamed, values kept) |
 | `--dry-run` | Show what would change; touch nothing |
 
 What it renames:
@@ -77,6 +78,7 @@ How the new project gets its `.env`:
 | The template folder… | The new project's `.env` |
 |---|---|
 | has a `.env` | A copy of it, renamed like every file (`SUPERAPP_*` → `ACME_SHOP_*`), **values kept** (Google client, SMTP…). Keys the template gained since are added |
+| `--env <file>` given | That file, renamed, values kept (wins over the template's own `.env`) |
 | has no `.env` (fresh clone, `--from`, `npx github:…`) | Created from `.env.example`: every `CHANGE_ME` replaced by a random secret, optional values left as placeholders (Google off, Mailpit for mail). Add your Google client and SMTP yourself |
 
 It also marks `backend/gradlew` executable in git, removes the

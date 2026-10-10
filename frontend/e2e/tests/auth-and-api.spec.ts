@@ -54,7 +54,8 @@ test.describe.serial('account lifecycle', () => {
     expect(me.status).toBe(200)
     expect(me.body).toMatchObject({ email: user.email, emailVerified: true })
 
-    expect((await api(page, 'GET', '/api/v1/public/config')).body).toMatchObject({ googleLoginEnabled: true })
+    // Google sign-in is optional (.env), so only the shape is fixed.
+    expect((await api(page, 'GET', '/api/v1/public/config')).body).toEqual({ googleLoginEnabled: expect.any(Boolean) })
 
     // Account APIs (Keycloak Admin API behind the BFF)
     const sessions = await api(page, 'GET', '/api/v1/account/sessions')

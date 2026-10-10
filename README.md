@@ -23,11 +23,12 @@ Docker images, database, environment variables, UI texts and emails.
 # from a local checkout into a new folder (the template stays untouched)
 node scripts/init-project.mjs "Acme Shop" ../acme-shop --fresh-git
 
-# or straight from GitHub, nothing to clone
-npx github:Jaga1999/SuperAppTemplate "Acme Shop" --fresh-git
+# or straight from GitHub, nothing to clone (--env reuses your template .env: Google client, SMTP)
+npx github:Jaga1999/SuperAppTemplate "Acme Shop" --env ./SuperApp/.env --fresh-git
 ```
 
-Options, what gets renamed and what to do afterwards: [docs/template.md](docs/template.md).
+Step-by-step runbook (generate, check, test, verify): [docs/project-initialization.md](docs/project-initialization.md).
+Every option and what gets renamed: [docs/template.md](docs/template.md).
 <!-- template:end -->
 
 ## What you get
@@ -163,7 +164,8 @@ Every folder and file explained: [docs/project-structure.md](docs/project-struct
 | [Testing](docs/testing.md) | Levels and the full scenario list · [backend](docs/testing-backend.md) · [frontend](docs/testing-frontend.md) |
 | [Deployment](docs/deployment.md) | What to know before production, topologies, checklist |
 | [Decoupled projects](docs/decoupled.md) | Deploying each part separately, the contracts between them |
-| [Using the template](docs/template.md) | Generate your own project |
+| [Project initialization](docs/project-initialization.md) | Runbook: generate a project, `.env`, Google, tests, verification |
+| [Using the template](docs/template.md) | Generator options and what gets renamed |
 
 ## Security at a glance
 
