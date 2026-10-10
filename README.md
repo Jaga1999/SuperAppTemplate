@@ -13,7 +13,7 @@ node scripts/init-project.mjs "Acme Shop" ../acme-shop --fresh-git
 The name is optional when you give a folder (`node scripts/init-project.mjs ../acme-shop` names it `acme-shop`).
 The copy includes everything except git history, build output and `node_modules`: sources, docs, your `.env`
 (renamed to match; review it and use new secrets for a new product) and the agent setup (`AGENTS.md`, `CLAUDE.md`,
-`.agent/` guardrails and rules, `.claude/` settings and skills, `.mcp.json`).
+`.claude/` settings and skills).
 
 Or convert a fresh clone in place (this also renames its folder):
 

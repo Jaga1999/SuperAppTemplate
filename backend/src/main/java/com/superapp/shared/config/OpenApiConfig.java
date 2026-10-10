@@ -131,7 +131,7 @@ class OpenApiConfig {
         } else if (!isPublic) {
             standard.put("403", "The signed-in user lacks the required role.");
         }
-        standard.put("429", "Rate limit exceeded. Retry after the number of seconds in the Retry-After header.");
+        standard.put("429", "Too many requests from this IP (edge rate limit). Slow down and retry.");
         standard.put("500", "Unexpected server error. The response carries a requestId to quote in support requests.");
         standard.forEach((status, description) -> {
             if (!responses.containsKey(status)) {
@@ -184,8 +184,7 @@ class OpenApiConfig {
               `XSRF-TOKEN` cookie (set on the first GET). Missing or wrong → `403`.
             * **Versioning:** the version is a path segment, currently `/api/v1/...`.
             * **Errors:** always `application/problem+json` (RFC 9457) with a stable `type`; see `ProblemDetail`.
-            * **Rate limits:** per user (signed in) or per IP. Responses carry `RateLimit-Limit` and
-              `RateLimit-Remaining`; a `429` carries `Retry-After`.
+            * **Rate limits:** per IP at the edge (nginx). Too many requests → `429`.
             * **Revocation is instant:** signing out, ending a session or disabling a user in Keycloak makes the
               next request return `401`, even before the access token expires.
 

@@ -15,9 +15,15 @@
       "Bash(docker compose up*)",
       "Bash(git status*)",
       "Bash(git diff*)",
-      "Bash(git log*)"
+      "Bash(git log*)",
+      "Bash(node scripts/start.mjs status*)",
+      "Bash(node scripts/start.mjs logs*)",
+      "Bash(npm --prefix keycloakify run typecheck*)",
+      "Bash(npm --prefix keycloakify run lint*)",
+      "Bash(./backend/gradlew -p keycloak/extensions build*)"
     ],
     "ask": [
+      "Bash(node scripts/start.mjs reset*)",
       "Bash(docker compose down*)",
       "Bash(docker volume rm*)",
       "Bash(docker system prune*)",
@@ -31,7 +37,5 @@
       "Read(./**/*.key)",
       "Edit(./backend/src/main/resources/db/migration/V1__baseline.sql)"
     ]
-  },
-  "enableAllProjectMcpServers": false,
-  "enabledMcpjsonServers": ["context7", "playwright", "shadcn"]
+  }
 }

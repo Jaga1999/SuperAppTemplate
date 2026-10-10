@@ -5,7 +5,7 @@ description: Add a page or screen to the SuperApp Next.js app (frontend/) using 
 
 # Add a frontend page
 
-Rules: `.agent/rules/frontend.md`. Reference: route `frontend/src/app/app/settings/sessions/page.tsx`, view `frontend/src/views/settings/sessions.tsx`.
+Rules: `AGENTS.md` (Frontend). Reference: route `frontend/src/app/app/settings/sessions/page.tsx`, view `frontend/src/views/settings/sessions.tsx`.
 
 ## Steps
 

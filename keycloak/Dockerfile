@@ -25,7 +25,10 @@ RUN --mount=type=cache,id=m2,target=/root/.m2 npm run build-keycloak-theme
 # ── 2. Kafka event listener SPI ──────────────────────────────────────────────
 FROM eclipse-temurin:25-jdk-noble AS spi
 WORKDIR /src
-COPY keycloak/extensions/superapp-extensions/ ./
+# One Gradle wrapper for the whole repository: the backend's.
+COPY backend/gradlew ./
+COPY backend/gradle/ gradle/
+COPY keycloak/extensions/ ./
 RUN --mount=type=cache,id=gradle,target=/root/.gradle chmod +x gradlew && ./gradlew assemble --no-daemon --console=plain
 
 # ── 3. Optimized Keycloak build on Java 25 ───────────────────────────────────
@@ -36,8 +39,8 @@ COPY --from=distribution /opt/keycloak /opt/keycloak
 COPY --from=theme /src/dist_keycloak/superapp-keycloak-theme.jar /opt/keycloak/providers/
 COPY --from=spi   /src/build/providers/ /opt/keycloak/providers/
 COPY keycloak/themes/ /opt/keycloak/themes/
-# Legal documents: the legal-consent required action reads their versions at startup (single source: legal/*.md)
-COPY legal/ /opt/keycloak/legal/
+# Legal documents: the legal-consent required action reads their versions at startup (single source: keycloak/legal/*.md)
+COPY keycloak/legal/ /opt/keycloak/legal/
 COPY keycloak/realm/ /opt/keycloak/data/import/
 # Build-time options (baked into the optimized image).
 # KC_FEATURES_DISABLED: deprecated features Keycloak enables by default that we don't use

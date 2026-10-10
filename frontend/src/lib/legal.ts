@@ -3,9 +3,9 @@ import path from 'node:path'
 import { cache } from 'react'
 
 /**
- * Legal documents, read on the server from legal/*.md at the repository root: the same files whose `version`
- * Keycloak's legal-consent step checks, so what users read is exactly what they accept. In the Docker image they
- * are copied to /legal (LEGAL_DIR overrides the location).
+ * Legal documents, read on the server from keycloak/legal/*.md: the same files whose `version` Keycloak's
+ * legal-consent step checks, so what users read is exactly what they accept. The path is ../keycloak/legal from the
+ * app's working directory, in development and in the Docker image alike (LEGAL_DIR overrides it).
  */
 export type LegalDocKind = 'terms' | 'privacy'
 
@@ -16,8 +16,8 @@ const FILES: Record<LegalDocKind, string> = {
   privacy: 'privacy-policy.md',
 }
 
-// Read at runtime only (not traced into the build output): the Docker image ships the files at /legal.
-const legalDir = () => process.env.LEGAL_DIR ?? path.join(/*turbopackIgnore: true*/ process.cwd(), '..', 'legal')
+// Read at runtime only (not traced into the build output).
+const legalDir = () => process.env.LEGAL_DIR ?? path.join(/*turbopackIgnore: true*/ process.cwd(), '..', 'keycloak', 'legal')
 
 /** Parsed once per request, however many components ask for it. */
 export const readLegalDoc = cache(async (kind: LegalDocKind): Promise<LegalDoc> => {

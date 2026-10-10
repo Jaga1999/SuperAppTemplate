@@ -6,7 +6,7 @@
 // In place (no destination): converts this checkout itself, then renames its folder. Run it on a fresh clone.
 //   node scripts/init-project.mjs "Acme Shop" --fresh-git
 // Into a new folder (destination given): copies the template there (including your .env, docs and the agent setup:
-// .agent/, .claude/, .mcp.json) and converts only the copy. This checkout stays untouched, so one local template can
+// .claude/, AGENTS.md, CLAUDE.md) and converts only the copy. This checkout stays untouched, so one local template can
 // create any number of projects.
 //   node scripts/init-project.mjs "Acme Shop" ../acme-shop --fresh-git
 //   node scripts/init-project.mjs ../acme-shop --fresh-git          (name taken from the folder name)
@@ -187,7 +187,7 @@ console.table({
 
 // ── Copy (destination mode) ─────────────────────────────────────────────────
 // Everything except git history, build output and dependencies: sources, docs, .env (renamed below, git-ignored),
-// agent setup (.agent/ guardrails and rules, .claude/ settings and skills, .mcp.json, AGENTS.md, CLAUDE.md).
+// agent setup (AGENTS.md, CLAUDE.md, .claude/ settings and skills).
 if (destination && !dryRun) {
   fs.cpSync(templateRoot, destination, {
     recursive: true,
@@ -342,9 +342,7 @@ if (freshGit && !dryRun) {
   if (process.platform === 'win32') git('config', 'core.longpaths', 'true') // deep paths under long user folders
   git('add', '-A')
   // Windows and npm tarballs don't keep the executable bit; record it so ./gradlew runs after a clone on macOS/Linux.
-  const wrappers = ['backend/gradlew', `keycloak/extensions/${name.kebab}-extensions/gradlew`]
-    .filter((p) => fs.existsSync(path.join(root, p)))
-  git('update-index', '--chmod=+x', ...wrappers)
+  git('update-index', '--chmod=+x', 'backend/gradlew')
   git('commit', '--quiet', '-m', `Initial commit: ${name.pascal} from the SuperApp template`)
   console.log('✔ Started a fresh git repository (one initial commit, no remote)')
 }

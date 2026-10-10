@@ -5,7 +5,7 @@ description: Change a Keycloak login/registration/MFA/passkey/email page, its te
 
 # Change a Keycloak page or realm setting
 
-Rules: `.agent/rules/keycloak.md`, `.agent/rules/frontend.md`. Background and known pitfalls: `docs/keycloak.md`.
+Rules: `AGENTS.md` (Keycloak, Frontend). Background and known pitfalls: `docs/keycloak.md`.
 
 ## Page look or behaviour
 

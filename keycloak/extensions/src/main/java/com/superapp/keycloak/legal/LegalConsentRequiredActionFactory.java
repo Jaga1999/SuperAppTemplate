@@ -13,7 +13,7 @@ import org.keycloak.models.KeycloakSessionFactory;
 
 /**
  * Registers {@link LegalConsentRequiredAction}. Reads the current document versions once at startup from
- * {@code SUPERAPP_LEGAL_DIR} (default {@code /opt/keycloak/legal}, where keycloak/Dockerfile copies {@code legal/}).
+ * {@code SUPERAPP_LEGAL_DIR} (default {@code /opt/keycloak/legal}, where keycloak/Dockerfile copies {@code keycloak/legal/}).
  * Missing or malformed documents stop Keycloak from starting: better than silently skipping consent.
  */
 public final class LegalConsentRequiredActionFactory implements RequiredActionFactory {

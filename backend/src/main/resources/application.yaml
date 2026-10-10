@@ -162,12 +162,6 @@ superapp:
       client-secret: ${SUPERAPP_BFF_CLIENT_SECRET:}
       admin-client-id: ${SUPERAPP_ADMIN_CLIENT_ID:superapp-admin-api}
       admin-client-secret: ${SUPERAPP_ADMIN_CLIENT_SECRET:}
-    rate-limit:
-      enabled: true
-      reads-per-minute: 300
-      writes-per-minute: 60
-      auth-per-minute: 20
-      login-pages-per-minute: 60
   identity:
     google-login-enabled: ${SUPERAPP_GOOGLE_LOGIN_ENABLED:false}
     events:

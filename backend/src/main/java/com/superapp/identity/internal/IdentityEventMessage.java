@@ -8,7 +8,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
  * The fields of the {@code keycloak.events} wire contract this consumer reads. Produced by the Keycloak SPI in
- * {@code keycloak/extensions/superapp-extensions} ({@code com.superapp.keycloak.events.IdentityEventMessage}), which
+ * {@code keycloak/extensions} ({@code com.superapp.keycloak.events.IdentityEventMessage}), which
  * sends more; unknown fields are ignored. Keep the names in sync.
  */
 record IdentityEventMessage(

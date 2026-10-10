@@ -1,7 +1,11 @@
 package com.superapp.auth.internal.token;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.HexFormat;
 import java.util.Optional;
 
 import org.slf4j.Logger;
@@ -11,7 +15,6 @@ import org.springframework.stereotype.Component;
 
 import com.superapp.auth.BffProperties;
 import com.superapp.shared.crypto.AeadCipher;
-import com.superapp.shared.crypto.Hashing;
 
 import tools.jackson.databind.json.JsonMapper;
 
@@ -45,7 +48,7 @@ public class RefreshCoordinator {
     }
 
     public TokenSet refresh(String refreshToken) {
-        var fingerprint = Hashing.sha256Hex(refreshToken);
+        var fingerprint = sha256Hex(refreshToken);
         var resultKey = "bff:refresh:result:" + fingerprint;
         var lockKey = "bff:refresh:lock:" + fingerprint;
 
@@ -87,5 +90,14 @@ public class RefreshCoordinator {
         return Optional.ofNullable(redis.opsForValue().get(key))
                 .flatMap(cipher::decrypt)
                 .map(value -> json.readValue(value, TokenSet.class));
+    }
+
+    private static String sha256Hex(String value) {
+        try {
+            var digest = MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(digest);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 unavailable", e);
+        }
     }
 }

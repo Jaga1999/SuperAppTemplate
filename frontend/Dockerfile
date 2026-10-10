@@ -23,8 +23,8 @@ ENV NODE_ENV=production \
     HOSTNAME=0.0.0.0
 COPY --from=build --chown=app:app /src/.next/standalone ./
 COPY --from=build --chown=app:app /src/.next/static ./.next/static
-# legal/*.md (repo root) backs /legal/terms and /legal/privacy; read at runtime from /legal (= ../legal from /app).
-COPY --chown=app:app legal/ /legal/
+# keycloak/legal/*.md backs /legal/terms and /legal/privacy; read at runtime from ../keycloak/legal (= /keycloak/legal).
+COPY --chown=app:app keycloak/legal/ /keycloak/legal/
 USER app
 EXPOSE 3000
 HEALTHCHECK --interval=10s --timeout=3s --retries=5 \

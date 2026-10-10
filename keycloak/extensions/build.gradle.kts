@@ -51,7 +51,7 @@ dependencies {
 tasks.test {
     useJUnitPlatform()
     // The real documents must always parse: they are what Keycloak loads at startup.
-    systemProperty("legal.dir", rootDir.resolve("../../../legal").canonicalPath)
+    systemProperty("legal.dir", rootDir.resolve("../legal").canonicalPath)
 }
 
 val copyProviders by tasks.registering(Sync::class) {

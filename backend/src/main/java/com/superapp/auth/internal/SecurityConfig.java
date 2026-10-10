@@ -5,6 +5,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
+import org.springframework.core.convert.converter.Converter;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -12,11 +13,13 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
-import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestRedirectFilter;
+import org.springframework.security.authentication.AbstractAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import org.springframework.security.web.context.RequestAttributeSecurityContextRepository;
 import org.springframework.security.web.csrf.CsrfFilter;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy;
@@ -25,15 +28,10 @@ import com.superapp.auth.BffProperties;
 import com.superapp.auth.CurrentUser;
 import com.superapp.auth.internal.cookie.AuthCookies;
 import com.superapp.auth.internal.oauth.BffAuthorizationRequestResolver;
-import com.superapp.auth.internal.oauth.BffLoginFailureHandler;
-import com.superapp.auth.internal.oauth.BffLoginSuccessHandler;
 import com.superapp.auth.internal.oauth.CookieAuthorizedClientRepository;
 import com.superapp.auth.internal.oauth.EncryptedCookieAuthorizationRequestRepository;
-import com.superapp.auth.internal.ratelimit.RateLimitFilter;
-import com.superapp.auth.internal.ratelimit.RateLimitFilter.Limit;
-import com.superapp.auth.internal.ratelimit.RedisRateLimiter;
+import com.superapp.auth.internal.oauth.LoginRedirects;
 import com.superapp.auth.internal.token.CookieBearerTokenResolver;
-import com.superapp.auth.internal.token.KeycloakJwtAuthenticationConverter;
 import com.superapp.auth.internal.token.RefreshCoordinator;
 import com.superapp.auth.internal.token.TokenRefreshFilter;
 import com.superapp.auth.internal.web.CsrfCookieFilter;
@@ -46,13 +44,14 @@ import tools.jackson.databind.json.JsonMapper;
  * no {@code HttpSession} is ever created; state lives in encrypted cookies, Keycloak and Redis.
  *
  * <pre>
- *  1  /auth/**                    → reverse proxy to Keycloak's themed login UI (allow-listed routes, rate-limited)
+ *  1  /auth/**                    → reverse proxy to Keycloak's themed login UI (allow-listed routes)
  *  2  /oauth2/**, /login/oauth2/** → OAuth2 login: start (PKCE) + callback → tokens into encrypted cookies
  *  3  /api/**                     → resource server: cookie → silent refresh → JWT verify → revocation → roles
  *  4  actuator (port 9090)        → health / info / prometheus only
  *  5  /v3/api-docs, /swagger-ui   → API description (never routed by nginx)
  *  6  everything else             → denied
  * </pre>
+ * Request rates are limited at the edge (nginx, per IP) and sign-in attempts by Keycloak's brute-force detection.
  */
 @Configuration(proxyBeanMethods = false)
 @EnableWebSecurity
@@ -61,13 +60,7 @@ public class SecurityConfig {
 
     @Bean
     @Order(1)
-    SecurityFilterChain keycloakProxyChain(HttpSecurity http, RedisRateLimiter limiter, JsonMapper json,
-            BffProperties properties) throws Exception {
-        var limits = properties.rateLimit();
-        // Form posts (password, OTP, reset) are tightly limited per IP; page/asset GETs much more loosely.
-        RateLimitFilter.Policy policy = request -> HttpMethod.POST.matches(request.getMethod())
-                ? new Limit("kc-post", limits.loginPagesPerMinute())
-                : new Limit("kc-get", limits.loginPagesPerMinute() * 10);
+    SecurityFilterChain keycloakProxyChain(HttpSecurity http) throws Exception {
         return http
                 .securityMatcher("/auth/**")
                 .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
@@ -76,7 +69,6 @@ public class SecurityConfig {
                 .headers(AbstractHttpConfigurer::disable)
                 .requestCache(AbstractHttpConfigurer::disable)
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .addFilterBefore(new RateLimitFilter(limiter, policy, json, limits.enabled()), AuthorizationFilter.class)
                 .build();
     }
 
@@ -84,9 +76,8 @@ public class SecurityConfig {
     @Order(2)
     SecurityFilterChain loginChain(HttpSecurity http, ClientRegistrationRepository registrations,
             EncryptedCookieAuthorizationRequestRepository authorizationRequests, AuthCookies cookies,
-            ApplicationEventPublisher events, BffProperties properties, RedisRateLimiter limiter, JsonMapper json)
-            throws Exception {
-        var limits = properties.rateLimit();
+            ApplicationEventPublisher events, BffProperties properties) throws Exception {
+        var redirects = new LoginRedirects(events, properties, cookies, authorizationRequests);
         return http
                 .securityMatcher("/oauth2/**", "/login/oauth2/**")
                 .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
@@ -95,15 +86,13 @@ public class SecurityConfig {
                                 .authorizationRequestResolver(new BffAuthorizationRequestResolver(registrations))
                                 .authorizationRequestRepository(authorizationRequests))
                         .authorizedClientRepository(new CookieAuthorizedClientRepository(cookies))
-                        .successHandler(new BffLoginSuccessHandler(events, properties))
-                        .failureHandler(new BffLoginFailureHandler(cookies, authorizationRequests)))
+                        .successHandler(redirects)
+                        .failureHandler(redirects))
                 // CSRF for the redirect flow is covered by state + PKCE (RFC 9700 §2.1, §4.7.1).
                 .csrf(AbstractHttpConfigurer::disable)
                 .requestCache(AbstractHttpConfigurer::disable)
                 .securityContext(context -> context.securityContextRepository(new RequestAttributeSecurityContextRepository()))
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .addFilterBefore(new RateLimitFilter(limiter, _ -> new Limit("login", limits.authPerMinute()), json, limits.enabled()),
-                        OAuth2AuthorizationRequestRedirectFilter.class)
                 .build();
     }
 
@@ -111,12 +100,7 @@ public class SecurityConfig {
     @Order(3)
     SecurityFilterChain apiChain(HttpSecurity http, AuthCookies cookies, RefreshCoordinator refresher,
             JwtDecoder jwtDecoder,
-            RedisRateLimiter limiter, JsonMapper json, BffProperties properties) throws Exception {
-        var limits = properties.rateLimit();
-        RateLimitFilter.Policy policy = request -> switch (request.getMethod()) {
-            case "GET", "HEAD", "OPTIONS" -> new Limit("api-read", limits.readsPerMinute());
-            default -> new Limit("api-write", limits.writesPerMinute());
-        };
+            JsonMapper json) throws Exception {
         var unauthorized = ProblemSecurityHandlers.unauthorized(json);
         var forbidden = ProblemSecurityHandlers.forbidden(json);
         return http
@@ -128,7 +112,7 @@ public class SecurityConfig {
                         .anyRequest().hasRole(CurrentUser.ROLE_USER))
                 .oauth2ResourceServer(rs -> rs
                         .bearerTokenResolver(new CookieBearerTokenResolver(cookies))
-                        .jwt(jwt -> jwt.decoder(jwtDecoder).jwtAuthenticationConverter(new KeycloakJwtAuthenticationConverter()))
+                        .jwt(jwt -> jwt.decoder(jwtDecoder).jwtAuthenticationConverter(realmRolesAsAuthorities()))
                         .authenticationEntryPoint(unauthorized)
                         .accessDeniedHandler(forbidden))
                 .exceptionHandling(ex -> ex.authenticationEntryPoint(unauthorized).accessDeniedHandler(forbidden))
@@ -140,7 +124,6 @@ public class SecurityConfig {
                         .referrerPolicy(ref -> ref.policy(ReferrerPolicy.NO_REFERRER)))
                 .addFilterAfter(new CsrfCookieFilter(), CsrfFilter.class)
                 .addFilterBefore(new TokenRefreshFilter(cookies, refresher), BearerTokenAuthenticationFilter.class)
-                .addFilterAfter(new RateLimitFilter(limiter, policy, json, limits.enabled()), BearerTokenAuthenticationFilter.class)
                 .build();
     }
 
@@ -183,6 +166,12 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .build();
+    }
+
+    /** Keycloak realm roles become Spring authorities ({@code admin} → {@code ROLE_admin}). */
+    private static Converter<Jwt, AbstractAuthenticationToken> realmRolesAsAuthorities() {
+        return jwt -> new JwtAuthenticationToken(jwt, CurrentUser.realmRoles(jwt).stream()
+                .map(role -> new SimpleGrantedAuthority("ROLE_" + role)).toList(), jwt.getSubject());
     }
 
     @Bean

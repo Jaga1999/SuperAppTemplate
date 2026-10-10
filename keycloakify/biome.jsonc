@@ -1,6 +1,6 @@
 {
 	"$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
-	"vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
+	"vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true, "root": ".." },
 	"files": {
 		"includes": [
 			"**",
@@ -50,7 +50,7 @@
 			"linter": { "rules": { "complexity": { "noImportantStyles": "off" } } }
 		},
 		{
-			// Keycloak pages: server messages are HTML and always pass through kcSanitize (see .agent/rules/frontend.md);
+			// Keycloak pages: server messages are HTML and always pass through kcSanitize (see AGENTS.md);
 			// positive tabindex keeps Keycloak's field order where links sit visually before inputs.
 			"includes": ["src/login/**"],
 			"linter": {

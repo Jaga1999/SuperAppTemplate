@@ -7,7 +7,6 @@ import java.util.Base64;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Positive;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
@@ -28,7 +27,6 @@ public record BffProperties(
         @Valid @NotNull Keycloak keycloak,
         @Valid @DefaultValue Cookies cookies,
         @NotBlank String encryptionKey,
-        @Valid @DefaultValue RateLimit rateLimit,
         @DefaultValue("PT15M") Duration revocationTtl,
         @DefaultValue("/app") String defaultReturnPath) {
 
@@ -47,14 +45,6 @@ public record BffProperties(
 
     /** @param secure {@code false} only for plain-http non-localhost hosts; disables the {@code __Host-} prefix. */
     public record Cookies(@DefaultValue("true") boolean secure) {
-    }
-
-    public record RateLimit(
-            @DefaultValue("true") boolean enabled,
-            @Positive @DefaultValue("300") int readsPerMinute,
-            @Positive @DefaultValue("60") int writesPerMinute,
-            @Positive @DefaultValue("20") int authPerMinute,
-            @Positive @DefaultValue("60") int loginPagesPerMinute) {
     }
 
     /** Issuer as seen by browsers and stamped into every token: {@code <publicUrl>/auth/realms/<realm>}. */

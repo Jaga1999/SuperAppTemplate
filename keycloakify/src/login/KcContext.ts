@@ -6,7 +6,7 @@ export type KcContextExtension = {
   properties: Record<KcEnvName, string> & {}
 }
 
-/** One document as sent by the superapp-legal-consent required action (keycloak/extensions/superapp-extensions). */
+/** One document as sent by the superapp-legal-consent required action (keycloak/extensions). */
 export type LegalDocumentView = {
   title: string
   version: string

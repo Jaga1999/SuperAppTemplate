@@ -7,7 +7,7 @@ description: Add a new backend feature module (entity, migration, service, versi
 
 Reference implementation: the `user` feature (`backend/src/main/java/com/superapp/user`: entity, repository, public
 `UserDirectory` facade, controller, identity-event listener). Read it first, then mirror its shape.
-Rules: `.agent/rules/backend.md`, `.agent/rules/security.md`, `.agent/rules/testing.md`.
+Rules: `AGENTS.md` (Guardrails, Backend, Security invariants, Testing).
 
 ## Steps
 

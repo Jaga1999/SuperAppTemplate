@@ -1,28 +1,46 @@
+# One ignore file for the whole repository.
+
 # Secrets: only .env.example is committed
 .env
 .env.*
 !.env.example
+*.local
 
-# Java / Gradle
+# Java / Gradle (only the wrapper jar is committed)
 *.class
-*.log
 *.jar
 !**/gradle/wrapper/gradle-wrapper.jar
 **/build/
 **/.gradle/
 **/out/
+backend/bin/
+HELP.md
 hs_err_pid*
 replay_pid*
 
-# Node
+# Node / Next.js / Vite / Keycloakify / Playwright
 **/node_modules/
 **/dist/
+**/dist-ssr/
 **/dist_keycloak/
+**/.next/
+next-env.d.ts
+*.tsbuildinfo
 **/playwright-report/
 **/test-results/
+
+# Logs
+*.log
+logs/
 
 # IDE / OS
 .idea/
 *.iml
+*.iws
+*.ipr
 .vscode/
+.project
+.classpath
+.settings/
+.factorypath
 .DS_Store

@@ -9,7 +9,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Metadata of one legal document, read from the front matter of {@code legal/*.md} (the repository's single source of
+ * Metadata of one legal document, read from the front matter of {@code keycloak/legal/*.md} (the repository's single source of
  * truth for both the text shown in the app and the version users must accept). Only {@code key: value} lines between
  * the leading {@code ---} markers are read; the body is not needed here.
  */
