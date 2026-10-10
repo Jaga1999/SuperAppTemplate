@@ -7,6 +7,7 @@ import { api, completeRequiredActions, expectInApp, kcPage, linkFromEmail, newId
  */
 test.describe.serial('account lifecycle', () => {
   const user = newIdentity()
+  let consentVersions: string[] = []
 
   test('register, verify email, set password, accept terms', async ({ page }) => {
     await page.goto('/app')
@@ -20,7 +21,9 @@ test.describe.serial('account lifecycle', () => {
     await page.locator('#kc-register-form button[type=submit]').click()
 
     // Legal consent, then email verification; Keycloak 26.8 asks for the password only after the address is proven.
-    const pages = await completeRequiredActions(page, user)
+    const { pages, legalVersions } = await completeRequiredActions(page, user)
+    consentVersions = legalVersions
+    expect(consentVersions).toHaveLength(2)
     expect(pages.filter((p) => p === 'legal-consent.ftl')).toHaveLength(1)
     expect(pages).not.toContain('terms.ftl') // the unversioned built-in action is off
     await expectInApp(page)
@@ -33,12 +36,14 @@ test.describe.serial('account lifecycle', () => {
     await expectInApp(page)
   })
 
-  test('the legal documents are public pages', async ({ page }) => {
+  test('the legal documents are public pages, with the versions Keycloak asked users to accept', async ({ page }) => {
+    // frontend/legal and keycloak/legal are separate copies (each image is self-contained): they must not drift.
     await page.goto('/legal/terms')
     await expect(page.getByRole('heading', { level: 1, name: 'Terms and Conditions' })).toBeVisible()
-    await expect(page.getByText(/Effective .* · Version /)).toBeVisible()
+    await expect(page.getByText(/Effective .* · Version /)).toHaveText(consentVersions[0])
     await page.getByRole('link', { name: 'Privacy Policy' }).click()
     await expect(page.getByRole('heading', { level: 1, name: 'Privacy Policy' })).toBeVisible()
+    await expect(page.getByText(/Effective .* · Version /)).toHaveText(consentVersions[1])
   })
 
   test('every API works for a signed-in user', async ({ page }) => {

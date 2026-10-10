@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.7
-# SuperApp Keycloak image. Build context: repository root.
+# SuperApp Keycloak image. Build context: repository root (uses only keycloakify/ and keycloak/).
 #
 #  1. theme  – builds the Keycloakify login theme JAR (keycloakify/, a standalone React project)
 #  2. spi    – builds our Keycloak extensions (Java 25): Kafka event listener, legal-consent required action
@@ -23,13 +23,12 @@ COPY keycloakify/ ./
 RUN --mount=type=cache,id=m2,target=/root/.m2 npm run build-keycloak-theme
 
 # ── 2. Kafka event listener SPI ──────────────────────────────────────────────
-FROM eclipse-temurin:25-jdk-noble AS spi
+FROM gradle:9.7.1-jdk25-noble AS spi
 WORKDIR /src
-# One Gradle wrapper for the whole repository: the backend's.
-COPY backend/gradlew ./
-COPY backend/gradle/ gradle/
 COPY keycloak/extensions/ ./
-RUN --mount=type=cache,id=gradle,target=/root/.gradle chmod +x gradlew && ./gradlew assemble --no-daemon --console=plain
+# The tests read the legal documents' front matter (build.gradle.kts: ../legal).
+COPY keycloak/legal/ /legal/
+RUN --mount=type=cache,id=gradle,target=/home/gradle/.gradle gradle build --no-daemon --console=plain
 
 # ── 3. Optimized Keycloak build on Java 25 ───────────────────────────────────
 FROM quay.io/keycloak/keycloak:${KEYCLOAK_VERSION} AS distribution

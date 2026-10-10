@@ -3,9 +3,9 @@ import path from 'node:path'
 import { cache } from 'react'
 
 /**
- * Legal documents, read on the server from keycloak/legal/*.md: the same files whose `version` Keycloak's
- * legal-consent step checks, so what users read is exactly what they accept. The path is ../keycloak/legal from the
- * app's working directory, in development and in the Docker image alike (LEGAL_DIR overrides it).
+ * Legal documents, read on the server from legal/*.md in this project (./legal from the working directory, in
+ * development and in the Docker image alike; LEGAL_DIR overrides it). Keycloak keeps its own copy in keycloak/legal
+ * for the consent step: keep both identical. The e2e suite fails if their versions differ.
  */
 export type LegalDocKind = 'terms' | 'privacy'
 
@@ -17,7 +17,7 @@ const FILES: Record<LegalDocKind, string> = {
 }
 
 // Read at runtime only (not traced into the build output).
-const legalDir = () => process.env.LEGAL_DIR ?? path.join(/*turbopackIgnore: true*/ process.cwd(), '..', 'keycloak', 'legal')
+const legalDir = () => process.env.LEGAL_DIR ?? path.join(/*turbopackIgnore: true*/ process.cwd(), 'legal')
 
 /** Parsed once per request, however many components ask for it. */
 export const readLegalDoc = cache(async (kind: LegalDocKind): Promise<LegalDoc> => {

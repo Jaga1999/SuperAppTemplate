@@ -50,8 +50,7 @@ services:
   nginx:
     <<: *restart
     build:
-      context: .
-      dockerfile: infra/nginx/Dockerfile
+      context: infra/nginx
     image: superapp/nginx:local
     environment:
       BACKEND_UPSTREAM: backend:8081
@@ -83,8 +82,7 @@ services:
   frontend:
     <<: *restart
     build:
-      context: .
-      dockerfile: frontend/Dockerfile
+      context: frontend
     image: superapp/frontend:local
     environment:
       PUBLIC_URL: ${PUBLIC_URL}   # canonical URLs, sitemap, Open Graph

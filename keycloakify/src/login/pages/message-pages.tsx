@@ -235,7 +235,9 @@ function LegalDocumentCard({ icon, doc, href, i18n }: { icon: ReactNode; doc: Le
         </div>
         {doc.summary && <p className="text-muted-foreground text-sm">{doc.summary}</p>}
         <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
-          {doc.effective && <span className="text-muted-foreground text-xs">{msg('legalEffective', doc.effective)}</span>}
+          <span className="text-muted-foreground text-xs" data-testid="legal-version">
+            {doc.effective ? msg('legalEffectiveVersion', doc.effective, doc.version) : msg('legalVersion', doc.version)}
+          </span>
           <a
             href={href}
             target="_blank"

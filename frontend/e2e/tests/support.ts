@@ -86,12 +86,19 @@ export async function expectInApp(page: Page) {
  * Completes whatever required actions Keycloak asks for, in any order, until the app loads.
  * Returns the Keycloak page ids it went through (so tests can assert e.g. that consent was asked exactly once).
  */
-export async function completeRequiredActions(page: Page, user: { email: string; password: string }): Promise<string[]> {
+/** Keycloak pages passed through, and the version lines the legal-consent page showed (Terms, Privacy). */
+export type RequiredActionsResult = { pages: string[]; legalVersions: string[] }
+
+export async function completeRequiredActions(
+  page: Page,
+  user: { email: string; password: string },
+): Promise<RequiredActionsResult> {
   const password = user.password
   const seen: string[] = []
+  let legalVersions: string[] = []
   for (let i = 0; i < 8; i++) {
     await page.waitForLoadState()
-    if (new URL(page.url()).pathname.startsWith('/app')) return seen
+    if (new URL(page.url()).pathname.startsWith('/app')) return { pages: seen, legalVersions }
     const id = await kcPage(page)
     if (id === undefined) {
       await page.waitForTimeout(300) // between redirects
@@ -107,7 +114,7 @@ export async function completeRequiredActions(page: Page, user: { email: string;
       await page.locator('#password-confirm').fill(password)
       await page.locator('#kc-passwd-update-form button[type=submit]').last().click()
     } else if (id === 'legal-consent.ftl') {
-      await acceptLegalConsent(page)
+      legalVersions = await acceptLegalConsent(page)
     } else if (id === 'terms.ftl') {
       await page.locator('#kc-accept').click()
     } else if (id === 'info.ftl') {
@@ -117,13 +124,15 @@ export async function completeRequiredActions(page: Page, user: { email: string;
     }
     await page.waitForURL((url) => url.toString() !== page.url(), { timeout: 15_000 }).catch(() => undefined)
   }
-  return seen
+  return { pages: seen, legalVersions }
 }
 
 /** The versioned consent page: both documents linked, Accept enabled only once both boxes are ticked. */
-export async function acceptLegalConsent(page: Page) {
+/** Accepts both documents; returns the "Effective … · Version …" line shown for each (Terms, Privacy). */
+export async function acceptLegalConsent(page: Page): Promise<string[]> {
   await expect(page.locator('a[href="/legal/terms"]')).toBeVisible()
   await expect(page.locator('a[href="/legal/privacy"]')).toBeVisible()
+  const versions = await page.getByTestId('legal-version').allInnerTexts()
   const accept = page.locator('#kc-accept')
   await expect(accept).toBeDisabled()
   await page.locator('#acceptTerms').click()
@@ -131,4 +140,5 @@ export async function acceptLegalConsent(page: Page) {
   await page.locator('#acceptPrivacy').click()
   await expect(accept).toBeEnabled()
   await accept.click()
+  return versions.map((v) => v.trim())
 }

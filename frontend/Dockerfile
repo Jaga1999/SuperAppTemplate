@@ -1,17 +1,17 @@
 # syntax=docker/dockerfile:1.7
-# SuperApp product app (Next.js standalone server). Build context: repository root.
-# It talks to nobody: browsers call the BFF through nginx; this server only renders pages.
+# SuperApp product app (Next.js standalone server). Build context: frontend/ (self-contained).
+# It talks to nobody: browsers call the BFF through the edge proxy; this server only renders pages.
 
 FROM node:24.21.0-trixie-slim AS deps
 WORKDIR /src
-COPY frontend/package.json frontend/package-lock.json ./
+COPY package.json package-lock.json ./
 RUN --mount=type=cache,id=npm,target=/root/.npm npm ci --no-audit --no-fund
 
 FROM node:24.21.0-trixie-slim AS build
 WORKDIR /src
 ENV NEXT_TELEMETRY_DISABLED=1
 COPY --from=deps /src/node_modules ./node_modules
-COPY frontend/ ./
+COPY . ./
 RUN npm run build
 
 FROM node:24.21.0-trixie-slim
@@ -23,8 +23,8 @@ ENV NODE_ENV=production \
     HOSTNAME=0.0.0.0
 COPY --from=build --chown=app:app /src/.next/standalone ./
 COPY --from=build --chown=app:app /src/.next/static ./.next/static
-# keycloak/legal/*.md backs /legal/terms and /legal/privacy; read at runtime from ../keycloak/legal (= /keycloak/legal).
-COPY --chown=app:app keycloak/legal/ /keycloak/legal/
+# legal/*.md backs /legal/terms and /legal/privacy (read at runtime from ./legal).
+COPY --chown=app:app legal/ ./legal/
 USER app
 EXPOSE 3000
 HEALTHCHECK --interval=10s --timeout=3s --retries=5 \

@@ -14,10 +14,10 @@ have their own Postgres and Kafka (Redis is app-only). Flyway owns the app schem
 | Folder | What |
 |---|---|
 | `backend/` | Spring Boot BFF. Features: `auth`, `identity`, `user`, `admin`, plus `shared` |
-| `frontend/` | Product app (Next.js). `frontend/e2e`: Playwright tests and the docs screenshot script |
+| `frontend/` | Product app (Next.js), self-contained incl. its `legal/` copy. `frontend/e2e`: Playwright tests, docs screenshots |
 | `keycloakify/` | Keycloak login theme, built into a JAR inside the Keycloak image |
 | `keycloak/` | Keycloak image: `realm/` (realm JSON), `themes/` (email theme), `extensions/` (Java SPIs), `legal/` (Terms, Privacy) |
-| `infra/` | nginx edge, Postgres init script |
+| `infra/` | `nginx/` edge proxy (own image), `postgres/` init script |
 | `scripts/` | `start.mjs` (local run), `init-project.mjs` (create a project from the template) |
 | `docs/` | Human documentation |
 
@@ -123,8 +123,17 @@ Quality
   set their own `prompt` (Google: `select_account`).
 - Extensions (`keycloak/extensions`) use only Keycloak's public SPI. The event format must match the BFF's
   `IdentityEventMessage`. Never touch the user/realm model after the transaction commits.
-- Legal documents: `keycloak/legal/*.md`. Changing a `version` makes every user re-accept: only when the meaning
-  changes. Don't re-enable the built-in `TERMS_AND_CONDITIONS` action.
+- Legal documents exist twice so each image is self-contained: `keycloak/legal/*.md` (consent step) and
+  `frontend/legal/*.md` (public pages). Edit both identically; the e2e suite fails if their versions differ. Changing
+  a `version` makes every user re-accept: only when the meaning changes. Don't re-enable `TERMS_AND_CONDITIONS`.
+
+## Deployables
+
+Each builds from its own folder, so it can live in its own repository or server: `backend/` (context `backend/`),
+`frontend/` (context `frontend/`), `infra/nginx/` (context `infra/nginx/`), and Keycloak (context: root, using only
+`keycloakify/` + `keycloak/`). They talk only through configuration (URLs in environment variables). The browser must
+reach the app, `/api`, `/oauth2`, `/login/oauth2` and `/auth` on one origin, so an edge proxy (nginx) routes those
+paths to wherever each service runs.
 
 ## Security invariants
 
