@@ -99,9 +99,10 @@ node scripts/start.mjs                      # builds and starts everything
 
 **What carries over.** Generating from a local checkout copies your `.env`, including `SUPERAPP_GOOGLE_LOGIN_ENABLED`,
 `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`. The variable names are renamed (`ACME_SHOP_GOOGLE_LOGIN_ENABLED`) and the
-values are kept, so the Google button works straight away. With `npx github:…` there is no local `.env` to copy: add
-the three values to the new project's `.env` yourself, then `node scripts/start.mjs reset --yes` (the realm reads them
-only at its first import).
+values are kept, so the Google button works straight away. When the template has no `.env` (a fresh clone, `--from`,
+`npx github:…`), the new `.env` is created from `.env.example` with generated secrets and Google turned off: add the
+three values to it yourself before the first start, or afterwards followed by `node scripts/start.mjs reset --yes`
+(the realm reads them only at its first import; reset deletes that project's local data).
 
 **What changes: the redirect URI.** Google accepts a sign-in only when it returns to a URI registered on the OAuth
 client. That URI contains the **realm name**, and every generated project has its own realm:

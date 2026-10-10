@@ -72,7 +72,14 @@ What it renames:
 | `com.superapp` | the Java package |
 | database `superapp` | `acme_shop` |
 
-It also copies your `.env` (renamed, with missing keys added), marks `backend/gradlew` executable in git, removes the
+How the new project gets its `.env`:
+
+| The template folder… | The new project's `.env` |
+|---|---|
+| has a `.env` | A copy of it, renamed like every file (`SUPERAPP_*` → `ACME_SHOP_*`), **values kept** (Google client, SMTP…). Keys the template gained since are added |
+| has no `.env` (fresh clone, `--from`, `npx github:…`) | Created from `.env.example`: every `CHANGE_ME` replaced by a random secret, optional values left as placeholders (Google off, Mailpit for mail). Add your Google client and SMTP yourself |
+
+It also marks `backend/gradlew` executable in git, removes the
 template-only files (`init-project.mjs`, root `package.json`, the README's template section) and prints the Google
 redirect URI to register for the new realm.
 

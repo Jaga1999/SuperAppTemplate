@@ -283,14 +283,17 @@ for (const from of collectNamed(root).sort((a, b) => b.length - a.length)) {
   move(from, path.join(path.dirname(from), base))
 }
 
-// ── .env: every key from .env.example, real secrets instead of CHANGE_ME ────
-// Keeps your values; adds keys the template gained since your .env was written; creates .env if there is none.
+// ── .env ─────────────────────────────────────────────────────────────────────
+// The template has a .env: it was copied above (renamed like every file); keep its values and add keys the template
+// gained since it was written. No .env (fresh clone, --from, npx): create it from .env.example, with generated secrets
+// instead of CHANGE_ME so the stack starts; optional values such as the Google client stay empty.
 function secretFor(key) {
   // The cookie key must decode to exactly 32 bytes; everything else is an opaque random string.
   return key === 'BFF_COOKIE_ENCRYPTION_KEY' ? randomBytes(32).toString('base64') : randomBytes(32).toString('base64url')
 }
 const envPath = path.join(root, '.env')
 const examplePath = path.join(root, '.env.example')
+let envFromExample = false
 if (fs.existsSync(examplePath)) {
   const keyOf = (line) => /^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=/.exec(line)?.[1]
   const existing = fs.existsSync(envPath) ? fs.readFileSync(envPath, 'utf8') : null
@@ -305,12 +308,17 @@ if (fs.existsSync(examplePath)) {
     if (key) added.push(key)
   }
   if (existing === null) {
+    envFromExample = true
     if (!dryRun) fs.writeFileSync(envPath, lines.join('\n'))
-    console.log(`✔ ${dryRun ? 'Would create' : 'Created'} .env from .env.example with generated secrets`)
-  } else if (added.length > 0) {
-    const block = `\n\n# Added by init-project from .env.example (new in the template)\n${lines.join('\n')}\n`
-    if (!dryRun) fs.writeFileSync(envPath, existing.replace(/\s*$/, '') + block)
-    console.log(`✔ ${dryRun ? 'Would add' : 'Added'} to .env: ${added.join(', ')}`)
+    console.log(`✔ The template has no .env: ${dryRun ? 'would create' : 'created'} one from .env.example with generated secrets`)
+    console.log('  Add optional values yourself (Google client, SMTP relay): see docs/configuration.md')
+  } else {
+    console.log(`✔ ${destination ? 'Copied the template\'s .env (renamed, values kept)' : 'Kept .env (renamed, values kept)'}`)
+    if (added.length > 0) {
+      const block = `\n\n# Added by init-project from .env.example (new in the template)\n${lines.join('\n')}\n`
+      if (!dryRun) fs.writeFileSync(envPath, existing.replace(/\s*$/, '') + block)
+      console.log(`✔ ${dryRun ? 'Would add' : 'Added'} to .env: ${added.join(', ')}`)
+    }
   }
 }
 
@@ -371,9 +379,9 @@ if (!destination && path.basename(root) !== name.kebab) {
 console.log(`
 Done. Next steps:
   cd "${finalRoot}"
-${fs.existsSync(path.join(finalRoot, '.env'))
-    ? '  review .env                     # copied from the template and renamed; use new secrets for a new product'
-    : '  (no .env yet: the next command creates one with generated secrets)'}
+${envFromExample
+    ? '  review .env                     # created from .env.example with generated secrets; add Google/SMTP if needed'
+    : '  review .env                     # copied from the template and renamed; use new secrets for a new product'}
   node scripts/start.mjs          # builds, starts and waits until everything is healthy
   then browse to ${publicUrl}
 
