@@ -26,7 +26,7 @@ node scripts/start.mjs logs <service>  # why?
 |---|---|
 | Sign-in loops back to the landing page | `PUBLIC_URL` must equal the address in the browser (scheme, host, port). Clear cookies for `localhost:8080` |
 | `Invalid parameter: redirect_uri` from Keycloak | The realm was imported with another `PUBLIC_URL`; reset local data |
-| Google: `redirect_uri_mismatch` | Register `<PUBLIC_URL>/auth/realms/<realm>/broker/google/endpoint` on the Google OAuth client (a renamed project has a different realm) |
+| Google: `redirect_uri_mismatch` ("Access blocked: This app's request is invalid") | Register `<PUBLIC_URL>/auth/realms/<realm>/broker/google/endpoint` on the Google OAuth client. Each generated project has its own realm, so each needs its own URI ([template.md](template.md#google-sign-in-in-a-new-project)) |
 | Google button missing | `SUPERAPP_GOOGLE_LOGIN_ENABLED=true` and client id/secret in `.env`, then reset |
 | No verification / reset email | Open Mailpit <http://localhost:8025>; else `logs keycloak` for SMTP errors |
 | Passkey dialog never appears | Use `localhost` (WebAuthn needs a secure context); the dialog opens only after clicking *Sign in with a passkey* |

@@ -126,7 +126,7 @@ Run `npm install` once in `frontend/` and `keycloakify/` before using their dev 
 | Port 8080/8025/8180/5432… already in use | Stop the other program, or change the left side of the port in `compose.override.yaml`. |
 | Sign-in loops back to the start page | Cookies from an older run: clear site data for `localhost:8080`. |
 | Changed the realm JSON but nothing changed | The realm imports only into an empty database: `node scripts/start.mjs reset --yes`. |
-| Google says `redirect_uri_mismatch` | Register `<PUBLIC_URL>/auth/realms/<realm>/broker/google/endpoint` on your Google OAuth client. |
+| Google says `redirect_uri_mismatch` | Register `<PUBLIC_URL>/auth/realms/<realm>/broker/google/endpoint` on your Google OAuth client. A project generated from the template has its own realm name, so it needs its own URI ([details](template.md#google-sign-in-in-a-new-project)). |
 
 More in [troubleshooting.md](troubleshooting.md).
 

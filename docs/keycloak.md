@@ -251,10 +251,16 @@ Register (email + name) → legal consent → verify email (link) → choose a p
 
 1. Google Cloud Console → Credentials → OAuth client (Web). Authorized redirect URI:
    `${PUBLIC_URL}/auth/realms/superapp/broker/google/endpoint` (development:
-   `http://localhost:8080/auth/realms/superapp/broker/google/endpoint`). The realm name is part of it: a project
-   created from this template needs its own entry (the generator prints it).
+   `http://localhost:8080/auth/realms/superapp/broker/google/endpoint`).
 2. In `.env`: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `SUPERAPP_GOOGLE_LOGIN_ENABLED=true`.
 3. Reset local data so the realm is imported with the new values.
+
+**The realm name is part of the redirect URI.** Every project generated from this template has its own realm
+(`acme-shop`, `nova-shop`…), so each one needs its own entry on the Google client, for example
+`http://localhost:8080/auth/realms/nova-shop/broker/google/endpoint`. Without it Google answers
+`Error 400: redirect_uri_mismatch`. The client id and secret can stay the same (they are copied with `.env`); only the
+URI list on Google's side grows. The generator prints the URI to add. Details:
+[template.md](template.md#google-sign-in-in-a-new-project).
 
 The IdP sends `prompt=select_account`; without its own prompt Keycloak would forward the client's `prompt=create`,
 which Google rejects.

@@ -90,10 +90,39 @@ node scripts/start.mjs                      # builds and starts everything
 
 1. Review `.env`: for a real product, generate new secrets (delete `.env` and run `start.mjs` again, or replace the
    values). Never reuse the template's secrets across products.
-2. Register the printed Google redirect URI on your Google OAuth client (or create a new client).
+2. Register the printed Google redirect URI on your Google OAuth client, or create a new client (see below).
 3. Adapt the product: name, colors, logo, landing page, legal texts ([customization.md](customization.md)).
 4. Create the remote repository and push.
 5. Run the checks ([testing.md](testing.md)).
+
+### Google sign-in in a new project
+
+**What carries over.** Generating from a local checkout copies your `.env`, including `SUPERAPP_GOOGLE_LOGIN_ENABLED`,
+`GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`. The variable names are renamed (`ACME_SHOP_GOOGLE_LOGIN_ENABLED`) and the
+values are kept, so the Google button works straight away. With `npx github:…` there is no local `.env` to copy: add
+the three values to the new project's `.env` yourself, then `node scripts/start.mjs reset --yes` (the realm reads them
+only at its first import).
+
+**What changes: the redirect URI.** Google accepts a sign-in only when it returns to a URI registered on the OAuth
+client. That URI contains the **realm name**, and every generated project has its own realm:
+
+| Project | Realm | Redirect URI to register |
+|---|---|---|
+| SuperApp (template) | `superapp` | `http://localhost:8080/auth/realms/superapp/broker/google/endpoint` |
+| Acme Shop | `acme-shop` | `http://localhost:8080/auth/realms/acme-shop/broker/google/endpoint` |
+| Nova Shop | `nova-shop` | `http://localhost:8080/auth/realms/nova-shop/broker/google/endpoint` |
+| Production | your realm | `https://<your-domain>/auth/realms/<realm>/broker/google/endpoint` |
+
+Until the new URI is registered, Google answers **`Error 400: redirect_uri_mismatch`** ("Access blocked: This app's
+request is invalid"). Nothing in the project needs to change. The generator prints the exact URI at the end of its run.
+
+To register it: Google Cloud Console → APIs & Services → Credentials → your OAuth client → **Authorized redirect URIs** →
+add the URI → Save. It takes effect within a few minutes.
+
+| Approach | When |
+|---|---|
+| One shared OAuth client, one redirect URI per project | Local development and experiments (a client can hold many URIs) |
+| A separate OAuth client per product | Real products: Google's consent screen shows that client's app name, logo and support email |
 
 ## 5. Keeping projects up to date with the template
 
