@@ -110,6 +110,17 @@ class ApiIntegrationTest {
     }
 
     @Test
+    void adminListsUsersAndValidatesPaging() {
+        var admin = UUID.randomUUID();
+        assertThat(mvc.get().uri("/api/v1/admin/users?page=0&size=20").with(as(admin, "user", "admin")))
+                .hasStatusOk()
+                .bodyJson().extractingPath("$.page.size").isEqualTo(20);
+        assertThat(mvc.get().uri("/api/v1/admin/users?size=500").with(as(admin, "user", "admin")))
+                .hasStatus(400)
+                .hasContentType(MediaType.APPLICATION_PROBLEM_JSON);
+    }
+
+    @Test
     void publicConfigIsReachableWithoutASession() {
         assertThat(mvc.get().uri("/api/v1/public/config")).hasStatusOk()
                 .bodyJson().extractingPath("$.googleLoginEnabled").isEqualTo(false);

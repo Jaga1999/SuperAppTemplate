@@ -7,9 +7,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
-import jakarta.validation.constraints.Max;
-import jakarta.validation.constraints.Min;
-
 import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -73,8 +70,8 @@ public class AdminController implements AdminApiDocs {
 
     @GetMapping("/users")
     @Override
-    public Page<AdminUserView> users(@RequestParam(defaultValue = "0") @Min(0) int page,
-            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
+    public Page<AdminUserView> users(@RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
         return users.list(PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt")))
                 .map(AdminController::view);
     }

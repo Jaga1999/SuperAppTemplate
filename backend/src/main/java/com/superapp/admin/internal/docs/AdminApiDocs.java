@@ -2,6 +2,9 @@ package com.superapp.admin.internal.docs;
 
 import java.util.UUID;
 
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 
@@ -36,8 +39,8 @@ public interface AdminApiDocs {
             users, whose personal fields are `null`.""")
     @ApiResponse(responseCode = "200", description = "One page of users with page metadata (`page.totalElements`, `page.totalPages`).")
     Page<AdminUserView> users(
-            @Parameter(description = "Zero-based page index.", example = "0") int page,
-            @Parameter(description = "Page size, 1 to 100.", example = "20") int size);
+            @Parameter(description = "Zero-based page index.", example = "0") @Min(0) int page,
+            @Parameter(description = "Page size, 1 to 100.", example = "20") @Min(1) @Max(100) int size);
 
     @Operation(summary = "One user with sign-in methods and live sessions", description = """
             The local projection next to Keycloak's live view of the same user:

@@ -1,168 +1,251 @@
 # Architecture
 
-SuperApp is a **single-module monolith** organised as feature packages, sitting behind an nginx edge and fronting a
-private Keycloak. This page explains how a request travels, where each responsibility lives, and why.
+How the pieces fit, how every request travels, and why it is built this way. Diagrams render on GitHub (Mermaid).
 
-## 1. Runtime topology
+## 1. The big picture
 
-| Container | Network | Role | Public? |
-|---|---|---|---|
-| `nginx` | edge + web | Edge rate limits; pages → `frontend`; `/api`, `/oauth2`, `/login/oauth2`, `/auth` → BFF | **yes (:8080)** |
-| `frontend` | web | Next.js server: renders pages, sets the per-request nonce CSP. No route to the BFF, Keycloak or any data store | no |
-| `backend` | edge + app-net + identity-net | The BFF: OAuth client, API, Keycloak proxy, event producer/consumer | no |
-| `postgres` | app-net | App database (`superapp`), schema owned by Flyway | no |
-| `redis` | app-net | Revocation markers, refresh single-flight, rate-limit buckets | no |
-| `kafka` | app-net | App KRaft broker; topics declared by the BFF at startup (auto-create off) | no |
-| `keycloak` | identity-net + keycloak-db | Identity provider (realm `superapp`), runs on Temurin 25 | no |
-| `keycloak-postgres` | keycloak-db | Keycloak's own database; only Keycloak can reach it | no |
-| `keycloak-kafka` | identity-net | Keycloak's own KRaft broker, carries `keycloak.events` only (created by Keycloak's event extension at startup; auto-create off) | no |
-| `mailpit` | identity-net | Dev SMTP sink for Keycloak (replace with a real SMTP relay in production) | no |
+One public entry point (nginx). Behind it, a **backend-for-frontend (BFF)** that is the only component allowed to talk
+to Keycloak. The browser never holds a token and never talks to Keycloak directly.
 
-The app and Keycloak share no data store: each has its own Postgres and Kafka, so a migration, outage or load spike on
-one side can't touch the other. Keycloak has no Redis (it caches in its embedded Infinispan).
-Every container gets only the environment variables it needs (see `compose.yaml`). Keycloak cannot be reached from the
-internet at all; the browser reaches its login pages only through the BFF's allow-listed proxy.
+```mermaid
+flowchart LR
+    browser(["Browser"])
 
-## 2. The BFF pattern
+    subgraph edge["Public: edge network"]
+        nginx["nginx :8080<br/>edge proxy, rate limits"]
+    end
 
-The browser holds **no tokens**. After sign-in, the BFF stores Keycloak's tokens in three cookies:
+    subgraph web["web network"]
+        frontend["frontend<br/>Next.js server<br/>renders pages only"]
+    end
 
-| Cookie | Content | Flags |
+    subgraph app["app-net: app data"]
+        backend["backend (BFF)<br/>Spring Boot :8081"]
+        postgres[("postgres<br/>app database")]
+        redis[("redis<br/>revocation markers")]
+        kafka[("kafka<br/>app events")]
+    end
+
+    subgraph identity["identity-net: identity traffic"]
+        keycloak["keycloak<br/>:8080/auth"]
+        kckafka[("keycloak-kafka<br/>keycloak.events")]
+        mailpit["mailpit<br/>dev SMTP"]
+    end
+
+    subgraph kcdb["keycloak-db"]
+        kcpostgres[("keycloak-postgres")]
+    end
+
+    browser -->|"https: pages"| nginx
+    nginx -->|"/ , /_next"| frontend
+    nginx -->|"/api, /oauth2, /login/oauth2, /auth"| backend
+    backend --> postgres
+    backend --> redis
+    backend --> kafka
+    backend -->|"tokens, admin API, /auth proxy"| keycloak
+    backend -->|"consumes"| kckafka
+    keycloak -->|"back-channel logout"| backend
+    keycloak -->|"publishes events"| kckafka
+    keycloak --> kcpostgres
+    keycloak -->|"emails"| mailpit
+```
+
+Rules the network layout enforces (verified with connection tests):
+
+| From | Can reach | Cannot reach |
 |---|---|---|
-| `__Host-sa_at` | access token | HttpOnly, Secure, SameSite=Lax, Path=/ |
-| `__Host-sa_rt` | refresh token | same |
-| `__Host-sa_ar` | in-flight authorization request (state, nonce, PKCE verifier, return path), 10 min | same |
+| Browser | nginx only (port 8080) | everything else |
+| nginx | frontend, backend | Keycloak, databases, Kafka, Redis |
+| frontend (Next.js) | nothing (it only answers nginx) | backend, Keycloak, any data store |
+| backend | its Postgres, Redis, Kafka; Keycloak; Keycloak's Kafka | Keycloak's database |
+| keycloak | its Postgres and Kafka, Mailpit, the backend (back-channel logout) | frontend, the app's database |
 
-Each value is AES-256-GCM encrypted; keys are derived per purpose with HKDF (Java 25 `javax.crypto.KDF`) from
-`BFF_COOKIE_ENCRYPTION_KEY`, and the purpose is bound as associated data, so a cookie cannot be replayed as another kind.
-No `HttpSession` exists anywhere, so any BFF instance can serve any request.
+The app and Keycloak each have their **own** Postgres and Kafka, so a migration, an outage or load on one side can't
+touch the other. Keycloak has no Redis: it caches in its embedded Infinispan.
 
-### Sign-in
+## 2. Who does what
 
-```
-App ──(full-page nav)──► /oauth2/authorization/keycloak?returnTo=/app&screen=register|idp=google|action=…
-BFF  builds the request (PKCE S256, nonce, allow-listed extras) → encrypted __Host-sa_ar cookie
-     302 → /auth/realms/superapp/protocol/openid-connect/auth?…            (same origin, through the BFF proxy)
-Keycloak renders the themed page (Keycloakify) … user signs in / registers / does MFA …
-     302 → /login/oauth2/code/keycloak?code=…&state=…
-BFF  validates state, exchanges the code on the private network (client secret + PKCE verifier),
-     validates the ID token (nonce), writes the token cookies, publishes UserSignedIn, 302 → returnTo
-```
-
-`returnTo`, `screen`, `idp`, `action` and `email` are validated against allow-lists in `LoginOptions`, so the login
-entry point can't be abused as an open redirect or for parameter injection.
-
-### Every API call
-
-```
-Browser fetch /api/v1/… (cookies + X-XSRF-TOKEN on writes)
-  → RequestIdFilter → CsrfFilter (+ CSRF_VERIFIED gate) → TokenRefreshFilter → BearerTokenAuthenticationFilter
-  → RateLimitFilter → controller
-```
-
-- **CSRF**: `csrf.spa()` (double-submit cookie). Spring skips CSRF for bearer requests, and our bearer token comes from
-  a cookie, so `CookieBearerTokenResolver` yields it only after `CsrfFilter` marked the request verified.
-- **Local JWT validation**: `NimbusJwtDecoder` with the internal JWKS; checks issuer (public URL), `typ=Bearer`, `azp`,
-  `aud` and the Redis revocation markers. No introspection call per request.
-- **Silent refresh**: if the access token expires within the skew, `TokenRefreshFilter` refreshes it. Keycloak allows
-  zero refresh-token reuse, so `RefreshCoordinator` takes a Redis lock per refresh token; parallel requests (on any
-  instance) wait and reuse the encrypted result.
-- **Rate limits**: Redis Lua token bucket per user (or IP when anonymous) for reads, writes and auth; nginx adds
-  coarse per-IP limits in front.
-- **Errors**: everything leaves as `application/problem+json` (RFC 9457) with a stable `type` URI; internals never leak.
-
-### Sign-out and instant revocation
-
-| Trigger | Path to the BFF | Effect |
+| Component | Responsibility | Never does |
 |---|---|---|
-| User clicks *Sign out* | `POST /api/auth/logout` | Keycloak logout by refresh token, cookies cleared |
-| Signed out elsewhere, session killed by admin | Keycloak **back-channel logout** → `POST /api/auth/backchannel-logout` (private network only; nginx returns 404 for it) | Redis `sid` marker → the access token is rejected on the next request |
-| Logout, account deleted or disabled, password reset | Keycloak event → SPI → Kafka `keycloak.events` → `KeycloakEventsListener` | session or per-user watermark revocation |
+| **Keycloak** | All authentication: sign-up, sign-in, passwords, passkeys, MFA, recovery codes, Google, email verification, password reset, sessions, tokens, user and role storage | Serve the browser directly; it is private |
+| **keycloakify** | The sign-in pages Keycloak renders (React, built into a theme JAR) | Run on its own in production |
+| **backend (BFF)** | OAuth client for the browser, token storage in encrypted cookies, silent refresh, CSRF, the allow-listed `/auth` proxy, instant revocation, the product API, the user projection | Store sessions (no HTTP session, no Spring Session); show login forms; accept passwords |
+| **frontend** | Renders the landing page, legal pages and the signed-in app; sets a strict per-request CSP | Call the BFF or Keycloak from the server; touch tokens |
+| **nginx** | The only public port; routes paths; per-IP rate limits; blocks internal endpoints | Talk to Keycloak |
 
-Access tokens live 5 minutes, but revocation takes effect on the very next request through the Redis markers.
+## 3. Signing in (Authorization Code + PKCE through the BFF)
 
-## 3. Keycloak behind the BFF
+```mermaid
+sequenceDiagram
+    autonumber
+    actor U as Browser
+    participant N as nginx
+    participant B as BFF
+    participant K as Keycloak
 
-`KeycloakProxyRoutes` (Spring Cloud Gateway Server WebMVC) proxies only:
-
-- `/auth/realms/superapp/protocol/openid-connect/auth`
-- `/auth/realms/superapp/login-actions/**`
-- `/auth/realms/superapp/broker/**` (Google callbacks)
-- `/auth/resources/**` (theme assets)
-
-Everything else (token, userinfo, JWKS, account console, admin console, other realms) returns 404. The BFF strips its
-own cookies before forwarding, and the gateway sends `X-Forwarded-*` so Keycloak sees the real client IP and host.
-
-Keycloak uses **split-horizon URLs**: tokens are issued for `${PUBLIC_URL}/auth/realms/superapp`, while the BFF talks to
-`http://keycloak:8080/auth` internally. Client registrations are explicit (no discovery at startup).
-
-## 4. Backend modules
-
+    U->>N: GET /oauth2/authorization/keycloak?returnTo=/app
+    N->>B: forward
+    B->>B: create state, nonce, PKCE verifier (S256)<br/>store them in encrypted cookie __Host-sa_ar (10 min)
+    B-->>U: 302 to /auth/realms/superapp/protocol/openid-connect/auth?code_challenge=…
+    U->>N: GET /auth/realms/superapp/…/auth
+    N->>B: forward (/auth is proxied by the BFF)
+    B->>K: allow-listed proxy request (BFF cookies stripped)
+    K-->>U: themed sign-in page (keycloakify)
+    U->>K: credentials / passkey / Google (still via nginx → BFF proxy)
+    K-->>U: 302 to /login/oauth2/code/keycloak?code=…&state=…
+    U->>N: GET /login/oauth2/code/keycloak
+    N->>B: forward
+    B->>B: check state, read PKCE verifier from __Host-sa_ar
+    B->>K: POST /token (code + verifier + client secret), private network
+    K-->>B: access, refresh and ID token
+    B->>B: verify ID token (signature, issuer, audience, nonce)<br/>publish UserSignedIn → upsert app_user
+    B-->>U: Set-Cookie __Host-sa_at, __Host-sa_rt (AES-GCM encrypted, HttpOnly, Secure, SameSite=Lax)<br/>302 to /app
 ```
+
+Why it's safe:
+
+- **PKCE (S256) + state + nonce**: a stolen authorization code is useless; the login can't be forged or replayed.
+- **Confidential client**: the code exchange needs the client secret, which only the BFF has.
+- **Exact redirect URIs** in the realm; the `returnTo` path is allow-listed (same-origin paths only, no `//host`).
+- The browser only ever sees encrypted cookies it can't read (HttpOnly).
+
+## 4. Every API call
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor U as Browser
+    participant N as nginx
+    participant B as BFF
+    participant R as Redis
+    participant K as Keycloak
+
+    U->>N: POST /api/v1/… (cookies + X-XSRF-TOKEN)
+    N->>B: forward (rate limit per IP)
+    B->>B: CSRF check (cookie vs header) → 403 if missing
+    alt access token expires in < 30 s
+        B->>R: lock this refresh token (single flight)
+        B->>K: POST /token grant_type=refresh_token
+        K-->>B: new access + rotated refresh token
+        B->>R: cache result 20 s for parallel requests
+        B-->>U: new cookies on this response
+    end
+    B->>B: verify JWT locally (RS256 signature via cached JWKS, issuer, audience, azp, typ, expiry)
+    B->>R: MGET revoked session / revoked-user watermark
+    alt revoked
+        B-->>U: 401 problem+json
+    else valid
+        B->>B: roles → authorities, run the endpoint
+        B-->>U: 200 JSON
+    end
+```
+
+- **Silent refresh** happens on the server; the frontend never notices. Refresh tokens rotate with **zero reuse**, so
+  parallel requests must not refresh twice: the Redis lock makes the first request refresh and the others reuse its
+  result.
+- **CSRF**: cookies are sent automatically, so every write must carry `X-XSRF-TOKEN` copied from the `XSRF-TOKEN`
+  cookie (Spring's double-submit). The bearer token is only read from the cookie *after* the CSRF check passed, so a
+  cookie-authenticated write without the header gets 403.
+- **Local JWT verification**: no call to Keycloak per request; the public keys are fetched once on the private network.
+
+## 5. Signing out, and instant revocation
+
+There are **no sessions in the BFF**. Keycloak owns sessions. The BFF only makes sure that, once Keycloak ends a
+session, tokens issued for it stop working immediately instead of living out their 5 minutes.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor U as Browser
+    participant B as BFF
+    participant R as Redis
+    participant K as Keycloak
+
+    Note over U,K: Sign out of this browser
+    U->>B: POST /api/auth/logout (XSRF header)
+    B->>R: SET bff:revoked:sid:<session> (15 min)
+    B->>K: end the SSO session (refresh token, server-to-server)
+    B-->>U: clear cookies, 204
+
+    Note over U,K: Session ended anywhere else (admin, "sign out everywhere", password reset, idle timeout)
+    K->>B: POST /api/auth/backchannel-logout (signed logout_token, private network)
+    B->>B: verify logout token (signature, issuer, audience, typ=Logout, events)
+    B->>R: SET bff:revoked:sid:<sid> or bff:revoked:user:<id> = now
+    Note over B,R: The next API call with an old token → 401
+```
+
+Revocation also arrives through Keycloak's event stream (Kafka): user disabled, deleted, logged out by an admin. A
+marker lives 15 minutes (longer than any access token), then expires on its own. Redis holds **only** these markers and
+a few seconds of refresh de-duplication; no session data.
+
+## 6. Keeping the app's user table in sync
+
+Keycloak owns identity. The app keeps a small projection (`app_user`) for joins, admin lists and erasure.
+
+```mermaid
+flowchart TB
+    subgraph KC["Keycloak"]
+        ev["user + admin events"]
+    end
+    ev -->|"superapp-kafka SPI, after commit"| topic[("keycloak-kafka<br/>topic keycloak.events")]
+    topic --> listener["KeycloakEventsListener<br/>(BFF)"]
+    listener -->|"logout, disable, delete"| rev["SessionRevocation<br/>(Redis markers)"]
+    listener -->|"register, profile, admin create/update"| proj["UserProjection"]
+    login["sign-in callback<br/>(UserSignedIn)"] --> proj
+    nightly["UserReconciliation<br/>nightly 03:30 UTC"] -->|"re-reads every user<br/>via Admin API"| proj
+    proj --> db[("app_user")]
+```
+
+| Path | When | What |
+|---|---|---|
+| Sign-in | every sign-in | Upsert from the verified ID token (never resurrects an erased user) |
+| Events | seconds after a change in Keycloak | Registration, profile and email changes, admin create/update/disable/delete |
+| Reconciliation | nightly (`superapp.user.reconciliation.cron`) | Re-reads every local user from Keycloak and repairs drift; erases users Keycloak no longer has. One run per cluster (Redis lock); aborts if the realm doesn't answer; stops after 50 erasures |
+
+The reconciliation exists because Keycloak's event producer is fire-and-forget: a sign-in never waits for Kafka, so an
+event can be lost during a broker outage.
+
+## 7. The pages
+
+```mermaid
+flowchart LR
+    landing["/ landing"] -->|"Get started / Sign in"| login["/oauth2/authorization/keycloak"]
+    login --> kc["Keycloak pages under /auth<br/>(keycloakify theme)"]
+    kc -->|"callback"| app["/app (signed-in area)"]
+    app --> settings["/app/settings<br/>profile · security · devices"]
+    app --> admin["/app/admin<br/>(role admin)"]
+    admin --> user["/app/admin/users/:id"]
+    landing --> legal["/legal/terms · /legal/privacy"]
+    settings -->|"change password, passkey, MFA…"| kc
+```
+
+Account changes (password, passkeys, authenticator app, recovery codes, linking Google, deleting the account) are not
+API calls: the app navigates to `/oauth2/authorization/keycloak?action=<ACTION>`, Keycloak shows its themed page,
+and the user returns with `?action=success|cancelled|error`.
+
+## 8. Backend modules
+
+```text
 com.superapp
-├── shared      crypto, web (problems, request id), config (Jackson, Kafka topics, OpenAPI, API versioning)
-├── auth        BFF security: chains, cookies, OAuth client, token refresh, revocation, rate limits, Keycloak proxy
-├── identity    Keycloak Admin API client (@HttpExchange), Keycloak events consumer, account endpoints
-├── user        local user projection (app_user), /me, nightly reconciliation with Keycloak
-└── admin       admin overview and user management (role admin)
+├── shared      error model (RFC 9457), request id, crypto (AES-GCM), Jackson policy, Kafka topics, OpenAPI, API versioning
+├── auth        security chains, OAuth client, encrypted cookies, refresh, revocation, the /auth proxy
+├── identity    Keycloak Admin API client, Keycloak event consumer, account endpoints, public config
+├── user        local user projection (app_user), /me, nightly reconciliation
+└── admin       admin overview, users, sessions (role admin)
 ```
 
-Rules (enforced by `ArchitectureTest` with ArchUnit, not by Spring Modulith):
+A feature's root package is its public API; implementation lives in `<feature>.internal`. `ArchitectureTest`
+(ArchUnit) fails the build if a feature reaches into another's `internal` package, if `shared` depends on a feature, or
+if packages form a cycle. Details: [backend.md](backend.md).
 
-- A feature exposes a small public API in its root package; everything else lives in `<feature>.internal`.
-- No feature may use another feature's `internal` package. `shared` depends on no feature. No package cycles.
-- Features talk through public interfaces (e.g. `UserDirectory`, `IdentityDirectory`) or events, never through each
-  other's repositories.
+## 9. Why these choices
 
-### Events
-
-```
-Keycloak ──► SPI superapp-kafka (after commit) ──► keycloak-kafka keycloak.events ──► KeycloakEventsListener ──► revocation + IdentityEvent
-```
-
-- App topics live on the app cluster and are declared in `shared/config/KafkaTopicsConfig`. The Keycloak listener
-  reads from Keycloak's cluster through its own container factory (`identity/internal/KeycloakEventsKafkaConfig`).
-- Delivery is at least once; consumers de-duplicate on an event id or are idempotent (revocation).
-- Failed records retry 4 times with back-off, then go to `<topic>.DLT` on the app cluster (the BFF never writes to
-  Keycloak's cluster). Unparseable JSON goes to the DLT at once.
-- Consumers read their own contract records (e.g. `IdentityEventMessage`), never the producer's classes.
-
-### User sync (Keycloak → `app_user`)
-
-Keycloak owns identity; `app_user` is a projection for joins, admin lists and erasure:
-
-1. **At sign-in**, from the verified ID token (`UserSignedIn`): race-free upsert, never resurrects an erased user.
-2. **From Keycloak's events** (Kafka): registration, profile/email changes, admin create/update/disable/delete.
-3. **Nightly** (`UserReconciliation`, `superapp.user.reconciliation.cron`, default 03:30 UTC): every local user is
-   re-read from Keycloak; profile and enabled state are copied, users gone from Keycloak are erased. One run per
-   cluster (Redis lock); aborts if the realm doesn't answer; stops after `max-erasures` (default 50) erasures.
-   Needed because Keycloak's event producer is fire-and-forget: a login never waits for Kafka.
-
-### JSON (Jackson 3)
-
-One Boot-managed `JsonMapper` serves HTTP, Kafka, Redis and cookies (`shared/config/JacksonConfig`): strict on
-primitives, tolerant of unknown fields, rejects duplicate keys and oversized or deeply nested input. Optional request
-fields are nullable wrappers; required inbound fields use `@JsonProperty(required = true)` or Bean Validation.
-
-## 5. Frontend
-
-Two independent React projects (npm, each with its own lockfile and its own copy of the shadcn UI kit):
-
-| Folder | Ships in | Notes |
-|---|---|---|
-| `frontend/` | `frontend` image | Next.js 16 App Router (standalone server). Server components for layouts, metadata and legal pages; client components fetch with TanStack Query from `/api` on the same origin; Zustand for client UI state. `frontend/e2e`: Playwright against the running stack |
-| `keycloakify/` | Keycloak image | Keycloakify 11; every login page re-implemented with the same design tokens |
-
-Neither the browser code nor the Next.js server ever calls Keycloak or holds a token. Every auth interaction (sign in, sign up, add passkey, change password, delete account)
-is a full-page navigation to `/oauth2/authorization/keycloak?action=…`, which runs a Keycloak application-initiated
-action on a themed page and returns to the app.
-
-## 6. Why these choices
-
-| Decision | Reason |
+| Choice | Reason |
 |---|---|
-| BFF instead of tokens in the browser | XSS can't steal what JavaScript can't read; refresh tokens never leave the server side |
-| Encrypted cookies instead of server sessions | Stateless horizontal scaling without sticky sessions or a session store |
-| Keycloak hidden behind the BFF | One origin (no CORS, `SameSite=Lax` works), smaller attack surface, Keycloak admin never public |
-| Keycloak owns identity | Passkeys, MFA, email flows, brute-force protection and Google are solved problems; don't re-implement them |
-| Pseudo-modular monolith | Clear boundaries (tested) without distributed-system cost; a feature can be extracted later |
+| BFF instead of tokens in the browser | No token can be stolen by XSS; the IETF's recommendation for browser apps |
+| Keycloak private, proxied by the BFF | One origin for cookies; the only reachable Keycloak paths are an allow-list |
+| Encrypted cookies, no server sessions | Stateless BFF: any instance serves any request; nothing to replicate |
+| Local JWT checks + Redis revocation markers | Fast requests without asking Keycloak, yet sign-out takes effect immediately |
+| Separate data stores for app and Keycloak | Failure and security isolation; each side can be scaled or moved alone |
+| Next.js server (not a static export) | Per-request CSP nonce: no inline script runs unless the server rendered it |
+| Feature packages + ArchUnit | Modular monolith without a framework; boundaries are tested |

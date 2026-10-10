@@ -108,11 +108,11 @@ test.describe.serial('documentation screenshots', () => {
     await expectInApp(page)
 
     await page.goto('/app/admin')
-    await expect(page.getByRole('heading', { name: 'Admin' })).toBeVisible()
+    await expect(page.getByRole('heading', { level: 2, name: 'Admin' })).toBeVisible()
     await shot(page, 'admin-overview')
 
     await page.getByRole('link', { name: new RegExp(user.email) }).click()
-    await expect(page.getByRole('heading', { name: 'Sessions' })).toBeVisible()
+    await expect(page.getByText('Every device signed in right now')).toBeVisible()
     await shot(page, 'admin-user')
   })
 

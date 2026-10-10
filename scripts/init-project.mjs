@@ -373,8 +373,8 @@ Done. Next steps:
   cd "${finalRoot}"
 ${fs.existsSync(path.join(finalRoot, '.env'))
     ? '  review .env                     # copied from the template and renamed; use new secrets for a new product'
-    : '  cp .env.example .env            # then change every CHANGE_ME value'}
-  docker compose up -d --build --wait
+    : '  (no .env yet: the next command creates one with generated secrets)'}
+  node scripts/start.mjs          # builds, starts and waits until everything is healthy
   then browse to ${publicUrl}
 
 Google sign-in: add this redirect URI to your Google OAuth client (Cloud Console → Credentials), or Google answers

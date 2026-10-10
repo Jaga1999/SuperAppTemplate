@@ -11,9 +11,9 @@ Run in order; stop and fix at the first failure. Report each step's real result.
    ```bash
    cd backend && ./gradlew test
    ```
-   Keycloak extensions (event listener, legal consent; includes a test that parses `legal/*.md`):
+   Keycloak extensions (event listener, legal consent; includes a test that parses `keycloak/legal/*.md`):
    ```bash
-   cd keycloak/extensions/superapp-extensions && ./gradlew build
+   ./backend/gradlew -p keycloak/extensions build
    ```
 2. Frontend (both React projects):
    ```bash
